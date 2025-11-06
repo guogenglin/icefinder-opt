@@ -80,8 +80,7 @@ def pending_file_type(filename):
 			filetype = 'gb'
 	return filetype
 
-if __name__ == '__main__':
-    
+def main():
     # Initialize
     args = get_argument().parse_args()
     
@@ -131,3 +130,5 @@ if __name__ == '__main__':
         if pathlib.Path(workdir / 'defense-finder-tmp').exists():
             shutil.rmtree(workdir / 'defense-finder-tmp')
 
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,14 @@
+<model inter_gene_max_space="60" min_mandatory_genes_required="3" min_genes_required="3" vers="2.0">
+    <gene name="AICE_rep1" presence="mandatory" loner="1" >
+        <exchangeables>
+            <gene name="AICE_rep2"/>
+            <gene name="AICE_rep3"/>
+        </exchangeables>
+              </gene>
+     <gene name="Phage_integrase" presence="mandatory" loner="1" >
+        <exchangeables>
+            <gene name="Recombinase"/>
+        </exchangeables>
+              </gene>
+    <gene name="AICE_tra" presence="mandatory" loner="1" />
+</model>

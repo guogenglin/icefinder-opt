@@ -247,7 +247,7 @@ and a genetic map:
 # Citation
 If you use or publish results obtained with this tool, please prioritize citing the paper of the original authors:
 
-M. Wang, G Liu, M Liu, C Tai, Z. Deng, J Song, H.Y. Ou. ICEberg 3.0: functional categorization and analysis of the integrative and conjugative elements in bacteria. Nucleic Acids Research.2024 Jan 5; 52(D1):D732-D737. - [doi: 10.1093/nar/gkad935](https://pmc.ncbi.nlm.nih.gov/articles/PMC10767825/)
+* M. Wang, G Liu, M Liu, C Tai, Z. Deng, J Song, H.Y. Ou. ICEberg 3.0: functional categorization and analysis of the integrative and conjugative elements in bacteria. Nucleic Acids Research.2024 Jan 5; 52(D1):D732-D737. - [doi: 10.1093/nar/gkad935](https://pmc.ncbi.nlm.nih.gov/articles/PMC10767825/)
 
 If you are also willing to cite this GitHub repository, it would be greatly appreciated: 
 

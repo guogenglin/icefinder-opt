@@ -125,10 +125,10 @@ def main():
         else:
             print('Error: unrecongnized file type.')
             sys.exit(1)
-        if tmp_dir.exists():
-            shutil.rmtree(tmp_dir)
-        if pathlib.Path(workdir / 'defense-finder-tmp').exists():
-            shutil.rmtree(workdir / 'defense-finder-tmp')
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
+    if pathlib.Path(workdir / 'defense-finder-tmp').exists():
+        shutil.rmtree(workdir / 'defense-finder-tmp')
 
 if __name__ == '__main__':
     main()

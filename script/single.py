@@ -1089,7 +1089,7 @@ def getfa(fasta_file, start, end, contig, filetype):
     
     for record in records:
         if record.id == contig:
-        	sequence = record.seq[int(start) - 1 : int(end)]
+            sequence = record.seq[int(start) - 1 : int(end)]
     
     return str(sequence)
 
@@ -1182,32 +1182,35 @@ def calculate_gc(fasta_file, contig, filetype, start, end, window_size = 500, st
     else:
         records = SeqIO.parse(fasta_file, 'gb')
     
+    sequence = ''
     for record in records:
         if record.id == contig:
-        	if start == 0:
-        		start = 1
-        	sequence = record.seq[start-1:end]
+            if start == 0:
+                start = 1
+            sequence = record.seq[start-1:end]
+            break
 
-	# windows = []
+    # windows = []
     gc_contents = []
     pos = []
-    j = start/1000 + 0.025
+    j = start / 1000 + 0.025
     for i in range(0, len(sequence) - window_size + 1, step_size):
         window = sequence[i:i+window_size]
         gc_content = (gc_fraction(window) * 100)
         gc_contents.append(gc_content)
         pos.append(round(j, 4))
         j += 0.05
+
     gcdict = {
-		        'xData':pos,
-		        'datasets':[{
-		            'name':'',
-		            'data':gc_contents,
-		            'unit':'%',
-		            'type':'line',
-		            "valueDecimals": 1
-		        }]
-	    }
+        'xData': pos,
+        'datasets': [{
+            'name': '',
+            'data': gc_contents,
+            'unit': '%',
+            'type': 'line',
+            "valueDecimals": 1
+        }]
+    }
     return gcdict
 
 def get_map(infile_name, input_file, MGEdict, infodict, genome_info, dictMGE, filetype, prefix, rootdir, out_dir, threads):

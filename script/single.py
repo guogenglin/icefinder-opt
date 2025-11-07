@@ -339,59 +339,45 @@ def get_MGE(infile_name, infile, genome_info, rootdir):
                         infodict[f'{category}{orig_num}']['mob'].add(mob)
                     if mpf:
                         infodict[f'{category}{orig_num}']['mpf'].add(mpf)
-    '''
-    MGEdict = {}
-    infodict = {}
-    for category in ['IME', 'AICE', 'ICE']:
-        # Select items of current category
-        items = [(k, v) for k, v in pre_MGEdict.items() if k[0] == category]
-        # Sort items by original number
-        items.sort(key=lambda x: x[0][1])
-        
-        # Reorder and assign new sequential keys
-        for i, (old_key, gene_dict) in enumerate(items):
-            new_key = f'{category}{i+1}'
-            MGEdict[new_key] = gene_dict
-            infodict[new_key] = pre_infodict[old_key]
-'''
+
     return MGEdict, infodict
 
 def remove_loner(MGE_dict, threshold = 20):
     # Exclude loner genes from MGE candidates
-    for sys_id in list(MGE_dict.keys()):
-        hit_ids = list(MGE_dict[sys_id]['hit_id'].keys())
-        if len(hit_ids) >= 2:
+    new_MGE_dict = {}
+    for sys_id, sys_data in MGE_dict.items():
+        hit_ids = list(sys_data['hit_id'].keys())
+        if len(hit_ids) < 2:
+            continue
             # Keep only hits that are close to at least one other hit within the threshold
-            filtered_hit_id = sorted([
-                x for x in hit_ids
-                if any(
-                    abs(int(x.split('_')[1]) - int(y.split('_')[1])) <= threshold
-                    and int(x.split('_')[1]) != int(y.split('_')[1])
-                    for y in hit_ids
-                )
-            ])
-            if filtered_hit_id:
-                # Retain only the filtered hits
-                MGE_dict[sys_id]['hit_id'] = {
-                    k: v for k, v in MGE_dict[sys_id]['hit_id'].items() if k in filtered_hit_id
-                }
-            else:
-                # Remove MGE system if no hits remain
-                MGE_dict.pop(sys_id)
+        filtered_hit_id = sorted([
+            x for x in hit_ids
+            if any(
+                abs(int(x.split('_')[1]) - int(y.split('_')[1])) <= threshold
+                and int(x.split('_')[1]) != int(y.split('_')[1])
+                for y in hit_ids
+            )
+        ])
+        if filtered_hit_id:
+            # Retain only the filtered hits
+            new_MGE_dict[sys_id] = sys_data.copy()
+            new_MGE_dict[sys_id]['hit_id'] = {
+                k: v for k, v in sys_data['hit_id'].items() if k in filtered_hit_id
+            }
 
     # Remove duplicate MGEs based on identical hit positions
     ICE_type = ''
     seen = set()
     unique_dict = {}
 
-    for sys_id in MGE_dict.keys():
+    for sys_id in new_MGE_dict.keys():
         # Detect when a new ICE type starts
         if ICE_type == '' or sys_id.rsplit('_', 1)[0] != ICE_type:
             ICE_type = sys_id.rsplit('_', 1)[0]
             seen = set()
-        t = tuple(MGE_dict[sys_id]['hit_id'].keys())
+        t = tuple(new_MGE_dict[sys_id]['hit_id'].keys())
         if t not in seen:
-            unique_dict[sys_id] = MGE_dict[sys_id]
+            unique_dict[sys_id] = new_MGE_dict[sys_id]
             seen.add(t)
 
     return unique_dict
@@ -399,36 +385,37 @@ def remove_loner(MGE_dict, threshold = 20):
 def validate_hits(MGE_dict, genome_info):
     # Verify if all hits of an ICE are located on the same contig and not at the edges.
     # Remove false matches. Only ICEs at contig edges (potential breaks) or covering the whole contig are retained.
-
-    for MGE in list(MGE_dict.keys()):  # MGE_dict[sys_id] = {'gene_name': [], 'hit_id': []}
+    
+    validated_MGE_dict = {}
+    for MGE, info in MGE_dict.items():  # MGE_dict[sys_id] = {'gene_name': [], 'hit_id': []}
         record_ids = []
-
-        for hit_id in MGE_dict[MGE]['hit_id']:
-            for record_id, info in genome_info.items():
-                tmpids = list(info['locusdict'].keys())
+        hit_status = {}
+        for hit_id in info['hit_id']:
+            for record_id, ginfo in genome_info.items():
+                tmpids = list(ginfo['locusdict'].keys())
                 for i, tmpid in enumerate(tmpids):
                     if hit_id == tmpid:
                         record_ids.append(record_id)
                         # Mark if the gene is not at the contig edge
                         if 20 <= i <= (len(tmpids) - 20):
-                            MGE_dict[MGE]['hit_id'][hit_id] = 'V'  # valid
+                            hit_status[hit_id] = 'V'  # valid
                         else:
-                            MGE_dict[MGE]['hit_id'][hit_id] = 'P'  # potential edge
+                            hit_status[hit_id] = 'P'  # potential edge
                         break
 
         # Determine if the ICE might be fake
-        break_status = set(MGE_dict[MGE]['hit_id'].values())
+        break_status = set(hit_status.values())
         if len(set(record_ids)) == 1:  # all hits are on a single contig
             contig_id = next(iter(record_ids))
             if genome_info[contig_id]['plasmid'] != 'T' and 'P' in break_status:
+                new_entry = info.copy()
+                new_entry['hit_id'] = hit_status
+                validated_MGE_dict[MGE] = new_entry
                 continue  # keep ICE at edge of chromosome
-            else:
-                MGE_dict.pop(MGE)  # discard ICE on plasmid or fully internal
-        else:
-            # hits are scattered across multiple contigs → discard
-            MGE_dict.pop(MGE)
+                # discard ICE on plasmid or fully internal
+                # hits are scattered across multiple contigs → discard
 
-    return MGE_dict
+    return validated_MGE_dict
     
 def check_ICE_genes(ICE_dict, genome_info):
     # This function attempts to recover potential ICEs based on mandatory and accessory genes.
@@ -485,7 +472,7 @@ def check_ICE_genes(ICE_dict, genome_info):
         end = []
         middle = []
         for ICE, info in ICE_dict.items():
-            if ICE_type not in ICE:
+            if ICE.rsplit('_', 2)[1] != ICE_type:
                 continue
             break_markers = list(info['hit_id'].values())
             if all(x == 'P' for x in break_markers):
@@ -611,6 +598,8 @@ def ICE_recovery(infile_name, genome_info):
 
                 for key, value in recovery_ICE.items():
                     if lines[0] in value['end'] or lines[0] in value['middle']:
+                        if lines[4] not in list(ICE_dict[lines[0]]['hit_id'].keys()):
+                            continue
                         rICEdict.setdefault(key, {}).setdefault(lines[0], {})[lines[4]] = tags
                         rinfodict.setdefault(key, {'mob': [], 'mpf': []})
 
@@ -663,15 +652,18 @@ def get_DR(infile_name, input_file, reverse = False):
 
 def remove_duplicate(MGEdict, rICEdict):
     # maybe some IME predicted by get_MGE is part of the recovered ICE.
-    for MGE in list(MGEdict.keys()):
+    remove_keys = []
+    for MGE in MGEdict:
         hit_list = list(MGEdict[MGE].keys())
         for rICE in rICEdict.values():
             rhit_list = []
             for i in rICE.values():
                 rhit_list += list(i.keys())
             if all(gene in rhit_list for gene in hit_list):
-                MGEdict.pop(MGE)
-                
+                remove_keys.append(MGE)
+
+    for k in remove_keys:
+        MGEdict.pop(k, None)
     return MGEdict
 
 def find_max_distance(numbers):
@@ -813,26 +805,20 @@ class DictMGE(object):
         self.trnalist = info[8]
         self.record = info[9]
 
-def MGE_reorder(*dicts):
+def MGE_reorder(MGEdict):
 
-    keys = list(dicts[0].keys())
+    new_MGEdict = {}
+    counters = {}
     
-    # count the No.
-    counters = defaultdict(int)
+    for key, value in MGEdict.items():
+        prefix = ''.join([c for c in key if not c.isdigit()])  # eg. 'IME'
+        counters[prefix] = counters.get(prefix, 0) + 1          # count
+        new_key = f"{prefix}{counters[prefix]}"                 # IME1、ICE2
+        new_MGEdict[new_key] = value
     
-    new_dicts = [{} for _ in dicts]
+    new_MGEdict
     
-    for key in keys:
-        prefix = ''.join([c for c in key if not c.isdigit()])
-        counters[prefix] += 1
-        new_key = f"{prefix}{counters[prefix]}"
-        
-        # 把每个字典对应的值映射到新键
-        for i, d in enumerate(dicts):
-            if key in d:
-                new_dicts[i][new_key] = d[key]
-    
-    return tuple(new_dicts)
+    return new_MGEdict
 
 def search_trna(contig, start_gene, direction, genome_info, trnalist):
 
@@ -868,10 +854,10 @@ def boundary_of_rICE(infile_name, gbfile, recovery_ICE, ICE_dict, genome_info, r
         
         end0_last = list(end0['hit_id'].values())[-1]
         end1_last = list(end1['hit_id'].values())[-1]
-        
+
         left_contig = find_located_contig(ICE_dict[info['end'][0]]['hit_id'].keys(), genome_info)
         right_contig = find_located_contig(ICE_dict[info['end'][1]]['hit_id'].keys(), genome_info)
-        
+
         trnalist = []
         if end0_last == 'P' and end1_last == 'P':
             left_gene = int(next(iter(rICEdict[ICE][info['end'][0]])).split('_')[1])
@@ -1706,7 +1692,9 @@ def _single(infile_name, input_file, filetype, rootdir, out_dir, json_out, threa
             if merged is not None:
                 dictMGE[MGE] = merged
     
-    MGEdict, infodict, dictMGE = MGE_reorder(MGEdict, infodict, dictMGE)
+    MGEdict = MGE_reorder(MGEdict)
+    infodict = MGE_reorder(infodict)
+    dictMGE = MGE_reorder(dictMGE)
     
     rdictICE = boundary_of_rICE(infile_name, gbfile, recovery_ICE, ICE_dict, genome_info, rICEdict, prefix)
     

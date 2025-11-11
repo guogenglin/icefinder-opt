@@ -902,6 +902,10 @@ def boundary_of_rICE(infile_name, gbfile, recovery_ICE, ICE_dict, genome_info, r
                 DR1 = genome_info[right_contig]['posdict'][gene_key(prefix, final_left)][0]
                 DR4 = genome_info[left_contig]['posdict'][gene_key(prefix, final_right)][1]
         
+        if DR1 == '0'：
+            DR1 = '1'
+        if DR4 == '0'：
+            DR4 = '1'
         records = SeqIO.parse(gbfile, 'genbank')
         genome_sequence = {}
         for record in records:

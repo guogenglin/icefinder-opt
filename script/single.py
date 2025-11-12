@@ -661,9 +661,22 @@ def remove_duplicate(MGEdict, rICEdict):
                 rhit_list += list(i.keys())
             if all(gene in rhit_list for gene in hit_list):
                 remove_keys.append(MGE)
+    for k in remove_keys:
+        MGEdict.pop(k, None)
+
+    for mge1, hits1 in MGEdict.items():
+        hit_list1 = set(hits1.keys())
+        for mge2, hits2 in MGEdict.items():
+            if mge1 == mge2:
+                continue
+            hit_list2 = set(hits2.keys())
+            if hit_list1.issubset(hit_list2):
+                to_remove.append(mge1)
+                break
 
     for k in remove_keys:
         MGEdict.pop(k, None)
+        
     return MGEdict
 
 def find_max_distance(numbers):

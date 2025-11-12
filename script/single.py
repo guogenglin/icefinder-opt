@@ -653,27 +653,26 @@ def get_DR(infile_name, input_file, reverse = False):
 def remove_duplicate(MGEdict, rICEdict):
     # maybe some IME predicted by get_MGE is part of the recovered ICE.
     remove_keys = []
-    for MGE in MGEdict:
-        hit_list = list(MGEdict[MGE].keys())
-        for rICE in rICEdict.values():
-            rhit_list = []
-            for i in rICE.values():
-                rhit_list += list(i.keys())
-            if all(gene in rhit_list for gene in hit_list):
-                remove_keys.append(MGE)
-    for k in remove_keys:
-        MGEdict.pop(k, None)
+    
+    if rICEdict:
+        for MGE in MGEdict.keys():
+            hit_list = list(MGEdict[MGE].keys())
+            for rICE in rICEdict.values():
+                rhit_list = []
+                for i in rICE.values():
+                    rhit_list += list(i.keys())
+                if all(gene in rhit_list for gene in hit_list):
+                    remove_keys.append(MGE)
 
-    for mge1, hits1 in MGEdict.items():
-        hit_list1 = set(hits1.keys())
-        for mge2, hits2 in MGEdict.items():
-            if mge1 == mge2:
+    for MGE1 in MGEdict.keys():
+        hit_list1 = list(MGEdict[MGE1].keys())
+        for MGE2 in MGEdict.keys():
+            if MGE2 == MGE1:
                 continue
-            hit_list2 = set(hits2.keys())
-            if hit_list1.issubset(hit_list2):
-                remove_keys.append(mge1)
-                break
-
+            hit_list2 = list(MGEdict[MGE2].keys())
+            if all(gene in hit_list2 for gene in hit_list1):
+                remove_keys.append(MGE1)
+    
     for k in remove_keys:
         MGEdict.pop(k, None)
         
@@ -823,9 +822,22 @@ class DictMGE(object):
         self.trnalist = info[8]
         self.record = info[9]
 
-def MGE_reorder(MGEdict):
-
-    new_MGEdict = {}
+def MGE_reorder(MGEdict, infodict, dictMGE):
+    
+    remove_keys = []
+    
+    for name1, MGE1 in dictMGE.items():
+        for name2, MGE2 in dictMGE.items():
+            if name2 == name1:
+                continue
+            if int(MGE2.DR1) <= int(MGE1.DR1) <= int(MGE2.DR4) and int(MGE2.DR1) <= int(MGE1.DR4) <= int(MGE2.DR4):
+                remove_keys.append(name1)
+                break
+    
+    for k in remove_keys:
+        MGEdict.pop(k, None)
+    
+    new_MGEdict, new_infodict, new_dictMGE = {}, {}, {}
     counters = {}
     
     for key, value in MGEdict.items():
@@ -833,10 +845,10 @@ def MGE_reorder(MGEdict):
         counters[prefix] = counters.get(prefix, 0) + 1          # count
         new_key = f"{prefix}{counters[prefix]}"                 # IME1、ICE2
         new_MGEdict[new_key] = value
+        new_infodict[new_key] = infodict[key]
+        new_dictMGE[new_key] = dictMGE[key]
     
-    new_MGEdict
-    
-    return new_MGEdict
+    return new_MGEdict, new_infodict, new_dictMGE
 
 def search_trna(contig, start_gene, direction, genome_info, trnalist):
 
@@ -1717,9 +1729,7 @@ def _single(infile_name, input_file, filetype, rootdir, out_dir, json_out, threa
             if merged is not None:
                 dictMGE[MGE] = merged
     
-    MGEdict = MGE_reorder(MGEdict)
-    infodict = MGE_reorder(infodict)
-    dictMGE = MGE_reorder(dictMGE)
+    MGEdict, infodict, dictMGE = MGE_reorder(MGEdict, infodict, dictMGE)
     
     rdictICE = boundary_of_rICE(infile_name, gbfile, recovery_ICE, ICE_dict, genome_info, rICEdict, prefix)
     

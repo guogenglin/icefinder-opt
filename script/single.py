@@ -671,7 +671,7 @@ def remove_duplicate(MGEdict, rICEdict):
                 continue
             hit_list2 = set(hits2.keys())
             if hit_list1.issubset(hit_list2):
-                to_remove.append(mge1)
+                remove_keys.append(mge1)
                 break
 
     for k in remove_keys:

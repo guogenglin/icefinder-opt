@@ -768,6 +768,11 @@ def merge_tRNA(info, DRlist, prefix, genome_info):
     DR3 = ''
     DR4 = genome_info[record]['posdict'][gene_key(prefix, end_point)][1]   # end pos of ICE
     
+    if DR1 == '0':
+        DR1 = '1'
+    if DR4 == '0':
+        DR4 = '1'
+
     if trnalist:
         if finalend == expanded_end:   # right end hasn't change
             start_point = finalstart   # maybe add of tRNA will change the left end, re-define it
@@ -915,9 +920,9 @@ def boundary_of_rICE(infile_name, gbfile, recovery_ICE, ICE_dict, genome_info, r
                 DR1 = genome_info[right_contig]['posdict'][gene_key(prefix, final_left)][0]
                 DR4 = genome_info[left_contig]['posdict'][gene_key(prefix, final_right)][1]
         
-        if DR1 == '0'：
+        if DR1 == '0':
             DR1 = '1'
-        if DR4 == '0'：
+        if DR4 == '0':
             DR4 = '1'
         records = SeqIO.parse(gbfile, 'genbank')
         genome_sequence = {}

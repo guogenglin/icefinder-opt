@@ -1441,6 +1441,8 @@ def getfasta(infile_name, input_file, ICE_name, contig, start_pos, end_pos, file
     with open(outfa, 'wt') as file:
         for record in records:
             if record.id == contig:
+                if start_pos > end_pos:
+                    start_pos, end_pos = end_pos, start_pos
                 sequence = str(record.seq[int(start_pos) - 1 : int(end_pos)])
         sequence_for_write = format_sequence(sequence)
         ICE_ID = f'>{infile_name}_{contig}_{start_pos}-{end_pos}'

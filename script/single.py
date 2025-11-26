@@ -823,7 +823,7 @@ class DictMGE(object):
         self.record = info[9]
 
 def MGE_reorder(MGEdict, infodict, dictMGE):
-    
+
     remove_keys = []
     
     for name1, MGE1 in dictMGE.items():
@@ -1724,10 +1724,16 @@ def _single(infile_name, input_file, filetype, rootdir, out_dir, json_out, threa
     
     dictMGE = {}
     if MGEdict:
+        remove_keys = []
         for MGE, info in MGEdict.items():
             merged = merge_tRNA(info, DRlist, prefix, genome_info)
             if merged is not None:
                 dictMGE[MGE] = merged
+            else:
+                remove_keys.append(MGE)
+        for k in remove_keys:
+            MGEdict.pop(k, None)
+            infodict.pop(k, None)
     
     MGEdict, infodict, dictMGE = MGE_reorder(MGEdict, infodict, dictMGE)
     

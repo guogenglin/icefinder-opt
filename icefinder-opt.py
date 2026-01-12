@@ -3,7 +3,7 @@
 Created on Tue Nov  4 11:36:36 2025
 
 @author: Genglin Guo
-@e-mail: 2019207025.njau.edu.cn
+@e-mail: 2019207025@njau.edu.cn
 
 This is an optimized version of ICEfinder2. I have rewritten some scripts and updated the logic.
 The original developers are Meng Wang and Hong-Yu OU from the School of Life Sciences & Biotechnology, 

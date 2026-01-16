@@ -1311,7 +1311,7 @@ def get_map(infile_name, input_file, MGEdict, infodict, genome_info, dictMGE, fi
         if mge.DR1 == '0':   # incase the DR is located in ori
             mge.DR1 = '1'
         gcc = gc(input_file, contig, int(mge.DR1), int(mge.DR4), filetype)   # gc content, eg. 37.86
-        ICEss[regi] = ','.join([contig, mge.DR1, mge.DR4, str(mge.start_point), str(mge.end_point), 
+        ICEss[regi] = ','.join([contig, str(mge.DR1), str(mge.DR4), str(mge.start_point), str(mge.end_point), 
                                 gcc])   #startpos, endpos, sgene, egene, gc
         
         if mge.DR2: # pending if there is a attL
@@ -1339,7 +1339,7 @@ def get_map(infile_name, input_file, MGEdict, infodict, genome_info, dictMGE, fi
             
         ICEinfo = {
 			'Type' : typeIE,
-			'Location (nt)' : mge.DR1 + '..' + mge.DR4,
+			'Location (nt)' : str(mge.DR1) + '..' + str(mge.DR4),
 			'Length (bp)' : str(int(mge.DR4) - int(mge.DR1) + 1),
 			'GC Content (%)' : gcc,
 			'oriT seq' : oritseqs,
@@ -1750,3 +1750,4 @@ def _single(infile_name, input_file, filetype, rootdir, out_dir, json_out, threa
     
     tmpfile = tmp_dir / infile_name
     shutil.rmtree(tmpfile)
+

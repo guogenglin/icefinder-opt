@@ -1751,3 +1751,4 @@ def _single(infile_name, input_file, filetype, rootdir, out_dir, json_out, threa
     tmpfile = tmp_dir / infile_name
     shutil.rmtree(tmpfile)
 
+

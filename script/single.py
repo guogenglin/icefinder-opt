@@ -3,7 +3,7 @@
 Created on Tue Nov  4 11:36:36 2025
 
 @author: Genglin Guo
-@e-mail: 2019207025.njau.edu.cn
+@e-mail: 2019207025@njau.edu.cn
 
 This is an optimized version of ICEfinder2. I have rewritten some scripts and updated the logic.
 The original developers are Meng Wang and Hong-Yu OU from the School of Life Sciences & Biotechnology, 
@@ -342,7 +342,7 @@ def get_MGE(infile_name, infile, genome_info, rootdir):
 
     return MGEdict, infodict
 
-def remove_loner(MGE_dict, threshold = 20):
+def remove_loner(MGE_dict, threshold = 30):
     # Exclude loner genes from MGE candidates
     new_MGE_dict = {}
     for sys_id, sys_data in MGE_dict.items():
@@ -397,7 +397,7 @@ def validate_hits(MGE_dict, genome_info):
                     if hit_id == tmpid:
                         record_ids.append(record_id)
                         # Mark if the gene is not at the contig edge
-                        if 20 <= i <= (len(tmpids) - 20):
+                        if 30 <= i <= (len(tmpids) - 30):
                             hit_status[hit_id] = 'V'  # valid
                         else:
                             hit_status[hit_id] = 'P'  # potential edge
@@ -482,7 +482,7 @@ def check_ICE_genes(ICE_dict, genome_info):
                     tmpids = list(contig_info ['locusdict'].keys())
                     if hit_ids in tmpids:
                         record_numbers = [int(tmpid.split('_')[1]) for tmpid in tmpids]
-                        if min(hit_numbers) - min(record_numbers) <= 20 and max(record_numbers) - max(hit_numbers) <= 20:
+                        if min(hit_numbers) - min(record_numbers) <= 30 and max(record_numbers) - max(hit_numbers) <= 30:
                             middle.append(ICE)
                         else:
                             end.append(ICE)

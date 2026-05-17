@@ -24,7 +24,7 @@ import warnings
 from Bio import BiopythonDeprecationWarning
 warnings.simplefilter("ignore", BiopythonDeprecationWarning)
 
-__version__ = '1.0'
+__version__ = '1.0.1'
 
 workdir = pathlib.Path.cwd()
 rootdir = pathlib.Path(__file__).resolve().parent

@@ -311,7 +311,9 @@ class TypingResults:
 
             for DR in DRlist:   # here is another prerequisite, the DR within trna must be the attL/R of ICE
                 DRs = DR.split(',')   # left_start, left_end, right_start, right_end
-                if left_gene.start <= int(DRs[0]) <= left_gene.end:
+                if left_gene.start <= int(DRs[0]) <= left_gene.end and int(DRs[3]) - right_gene.end <= 10000:
+                    # there has to be a limit for DRs pending, or irrelevant DR will be misused. 10000bp approximately
+                    # for more than 10 genes, that will be enough.
                     self.end_point, self.expanded_end = pos_tag(
                              DRs[3], assembly_info.contigs[self.contig].genes, self.end_point, self.expanded_end, max_in_contig, 'e', EXPAND)
                     self.start_point = self.expanded_start
@@ -321,7 +323,7 @@ class TypingResults:
                     self.DR3 = int(DRs[2]) + 1
                     self.DR4 = int(DRs[3])
                     break
-                elif right_gene.start <= int(DRs[3]) <= right_gene.end:
+                elif right_gene.start <= int(DRs[3]) <= right_gene.end and left_gene.start - int(DRs[0]) <= 10000:
                     self.start_point, self.expanded_start = pos_tag(
                             DRs[0], assembly_info.contigs[self.contig].genes, self.start_point, self.expanded_start, min_in_contig, 's', EXPAND)
                     self.end_point = self.expanded_end

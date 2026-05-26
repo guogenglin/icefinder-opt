@@ -277,8 +277,10 @@ class Recovery:
             for DR in rDRlist:
                 DRs = DR.split(',')
                 if self.left_direction == '+' and self.right_direction == '+':
-                    if (self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end
-                        or self.expanded_right.start <= int(DRs[3]) <= self.expanded_right.end):
+                    if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
+                         and int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)
+                        or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
+                            and self.expanded_left.start - int(DRs[0]) <= 10000)):
                         self.DR1 = int(DRs[0]) + 1
                         self.DR2 = int(DRs[1])
                         self.DR3 = int(DRs[2]) - len(self.left_seq) + 1
@@ -287,8 +289,10 @@ class Recovery:
                         self.left_seq = self.left_seq[self.DR1:]
                         self.right_seq = self.right_seq[:self.DR4 - len_left_seq]
                 elif self.left_direction == '-' and self.right_direction == '+':
-                    if ((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start)
-                        or self.expanded_right.start <= int(DRs[3]) <= self.expanded_right.end):
+                    if (((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start) 
+                         and int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)
+                        or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
+                            and len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
                             self.DR1 = len_left_seq - int(DRs[1])
                             self.DR2 = len_left_seq - int(DRs[0]) + 1
                             self.DR3 = int(DRs[2]) - len(self.left_seq) + 1
@@ -297,8 +301,10 @@ class Recovery:
                             self.left_seq = self.left_seq[int(DRs[0]) + 1:]
                             self.right_seq = self.right_seq[:self.DR4 - len_left_seq]
                 else:   # self.left_direction == '+' and self.right_direction == '-', there are only 3 posibility because of pending_direction
-                    if (self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end
-                        or self.expanded_right.start <= (len_right_seq - int(DRs[3]) + len_left_seq) <= self.expanded_right.end):
+                    if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
+                         and int(DRs[3]) - len_left_seq - len_right_seq + self.expanded_right.end <= 10000)
+                        or self.expanded_right.start <= (len_right_seq - int(DRs[3]) + len_left_seq) <= self.expanded_right.end 
+                        and self.expanded_left.start - int(DRs[0]) <= 10000):
                             self.DR1 = int(DRs[0]) + 1
                             self.DR2 = int(DRs[1])
                             self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1

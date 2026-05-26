@@ -161,6 +161,7 @@ def get_MGE(assembly_info: Assembly, rootdir: Path, temp_dir: Path, verbose: boo
                     category = 'AICE'
                 else:
                     category = 'ICE'
+
                 # Store gene tags
                 if content[5] not in MGE_results:
                     MGE_results[content[5]] = TypingResults(content[5], category)

@@ -149,7 +149,7 @@ Other options:
 
 ## Quick start
 ``` Python
-PYTHONPATH=src(the root folder) python -m icefinder-opt.cli -i *.fasta 
+PYTHONPATH=src(the root folder) python -m icefinder-opt.cli assembly -i *.fasta 
 ```
 
 # Output

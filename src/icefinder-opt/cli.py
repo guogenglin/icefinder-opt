@@ -24,7 +24,7 @@ warnings.simplefilter("ignore", BiopythonDeprecationWarning)
 
 from .log import formatted_description, bold, ICEfinderError, log
 from .utils import check_cpus, check_programs_shutil
-from .single import _single
+from .single import assembly_prediction
 from .metaICE import _meta
 
 __version__ = '1.1.0'
@@ -118,8 +118,7 @@ def parameter_opts(opts: argparse.ArgumentParser):
     '''
     opts.add_argument('-t', '--threads', type = int, default = check_cpus(),
                         help = 'Number of threads (default: all available cpus)')
-    opts.add_argument('-s', '--max_space', type = int,
-                        help = 'Max gene space for scanning ICE by Macsyfinder(default: 30)')
+    # opts.add_argument('-s', '--max_space', type = int, help = 'Max gene space for scanning ICE by Macsyfinder(default: 30)')
     opts.add_argument('-j', '--json', action='store_true', 
                         help = 'output the json based genetic map')
 
@@ -169,7 +168,7 @@ def main(argv: list[str] | None = None):
     if args.subparser_name == 'assembly':
         for input_file in args.input:
             with tempfile.TemporaryDirectory() as temp_dir:
-                _single(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
+                assembly_prediction(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
     elif args.subparser_name == 'metagenome':
         for input_file in args.input:
             with tempfile.TemporaryDirectory() as temp_dir:

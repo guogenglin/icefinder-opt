@@ -112,22 +112,38 @@ Contributions to make the code faster or cleaner are welcome!
 `BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `kraken`, `defense-finder`, `mob_suite`, `biopython`, `python` >= 3.11
 
 # Usage
+I designed icefinder-opt to be easier to use on the command-line by structuring the program as a series of sub-commands that follow the general pattern of:
 ```
-icefinder-opt [-h] -i INPUT [INPUT ...] [-t TYPE] [-o OUTPUT] [-c THREADS] [-j] [-v]
+PYTHONPATH=src(the root folder) python -m icefinder-opt.cli  <command> [options]
+```
+
+Two modes, one for single genome: ```assembly```, another for metagenome: ```metagenome```.
+
+## Assembly
+```
 Input and Output:
   -i, --input             FASTA/Genbank format file, Genbank format file accepted only for single genome.
-  -t, --type              Genome Type: Single/Metagenome (default: single)
   -o, --output            Output dir (default: ICEfinder_result)
 Parameters:
-  -c, --threads           Threads to use for BLAST searches (default: 4)
+  -t, --threads           Threads to use for BLAST searches
   -j, --json              output the json based genetic map (default: False)
-  -h, --help              show this help message and exit
+
+```
+
+## Metagenome
+For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. I will rewrite this part further.
+
+## Other options
+```
+Other options:
+  -V, --verbose           Keep all output files and print debug messages to stderr
   -v, --version           Show version number and exit
+  -h, --help              Show this help message and exit
 ```
 
 ## Quick start
 ``` Python
-python icefinder-opt.py -i *.fasta 
+PYTHONPATH=src(the root folder) python -m icefinder-opt.cli -i *.fasta 
 ```
 
 # Output
@@ -249,7 +265,7 @@ summary json:
 
 ```
 and a genetic map:
-<img width="1505" height="751" alt="屏幕截图 2025-11-06 161732" src="https://github.com/user-attachments/assets/0c658726-9dd8-4e15-bea4-bf9dedc1a2cc" />
+<img width="1505" height="751" alt="screenshot" src="https://github.com/user-attachments/assets/0c658726-9dd8-4e15-bea4-bf9dedc1a2cc" />
 
 # Citation
 If you use or publish results obtained with this tool, please prioritize citing the paper of the original authors:

@@ -434,7 +434,7 @@ def boundary_of_rICE(assembly_info: Assembly, recovery_MGEs: dict[str, list[MacS
     log('Recovery ICE results merged with tRNA information.', verbose = verbose)
     return recovery_ICEs    
 
-def _single(input_file: Path, json_set: bool, threads: int, rootdir: Path, output_dir: Path, temp_dir: Path, 
+def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir: Path, output_dir: Path, temp_dir: Path, 
             verbose: bool):
     '''
     The main function for single genome analysis.

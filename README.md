@@ -109,7 +109,7 @@ Many areas could be improved for efficiency and readability.
 Contributions to make the code faster or cleaner are welcome!
 
 # Dependencies
-`BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `kraken`, `defense-finder`, `biopython`, `python` >= 3.8
+`BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `kraken`, `defense-finder`, `mob_suite`, `biopython`, `python` >= 3.11
 
 # Usage
 ```
@@ -169,16 +169,16 @@ middle_probability | `-` | Confidence for the prediction that a given middle reg
 
 for example:
 ```
-Isolate	MGE	Location	Length	GC	Relaxase_Type	Systems	oriT	attL	attR	att_seq	tRNA	AMR	middle	middle_probably
-1082_KOXY	1082_KOXY_ICE1	NZ_JWDP01000035.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-	-
-1082_KOXY	1082_KOXY_ICE2	NZ_JWDP01000172.1:(16845..43731)	26887	49.51	MOBH	typeG	-	16845..16859	43717..43731	AACCGTAGAAATACG	tRNA-Leu(caa),NZ_JWDP01000172.1:16804..16888[+]	-	-	-
-1082_KOXY	1082_KOXY_IME2	NZ_JWDP01000026.1:(2219..10245)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-	-
-1084_KOXY	1084_KOXY_ICE1	NZ_JWDN01000042.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-	-
-1084_KOXY	1084_KOXY_ICE2	NZ_JWDN01000183.1:(16816..39690)	22875	48.16	MOBH	typeG	-	16816..16830	39676..39690	AAATCGGTAGACGCA	tRNA-Leu(caa),NZ_JWDN01000183.1:16804..16888[+]	-	-	-
-1085_KOXY	1085_KOXY_ICE1	NZ_JWDM01000043.1:(16801..47867)	31067	49.00	MOBH	typeG	-	16801..16815	47853..47867	TGGCGAAATCGGTAG	tRNA-Leu(caa),NZ_JWDM01000043.1:16794..16878[+]	-	-	-
-1085_KOXY	1085_KOXY_IME1	NZ_JWDM01000060.1:(5435..13461)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-	-
-1085_KOXY	1085_KOXY_ICE2	NZ_JWDM01000157.1:(3747..24973)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-	-
-109680-17	109680-17_ICE1	NZ_VNMN01000028.1:(23715..55638)	31924	53.00	MOBF	typeF	-	-	-	-	-	-	-	-
+Isolate	MGE	Location	Length	GC	Relaxase_Type	Systems	oriT	attL	attR	att_seq	tRNA	AMR	middle
+1082_KOXY	1082_KOXY_ICE1	NZ_JWDP01000035.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+1082_KOXY	1082_KOXY_ICE2	NZ_JWDP01000172.1:(16845..43731)	26887	49.51	MOBH	typeG	-	16845..16859	43717..43731	AACCGTAGAAATACG	tRNA-Leu(caa),NZ_JWDP01000172.1:16804..16888[+]	-	-
+1082_KOXY	1082_KOXY_IME2	NZ_JWDP01000026.1:(2219..10245)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
+1084_KOXY	1084_KOXY_ICE1	NZ_JWDN01000042.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+1084_KOXY	1084_KOXY_ICE2	NZ_JWDN01000183.1:(16816..39690)	22875	48.16	MOBH	typeG	-	16816..16830	39676..39690	AAATCGGTAGACGCA	tRNA-Leu(caa),NZ_JWDN01000183.1:16804..16888[+]	-	-
+1085_KOXY	1085_KOXY_ICE1	NZ_JWDM01000043.1:(16801..47867)	31067	49.00	MOBH	typeG	-	16801..16815	47853..47867	TGGCGAAATCGGTAG	tRNA-Leu(caa),NZ_JWDM01000043.1:16794..16878[+]	-	-
+1085_KOXY	1085_KOXY_IME1	NZ_JWDM01000060.1:(5435..13461)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
+1085_KOXY	1085_KOXY_ICE2	NZ_JWDM01000157.1:(3747..24973)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+109680-17	109680-17_ICE1	NZ_VNMN01000028.1:(23715..55638)	31924	53.00	MOBF	typeF	-	-	-	-	-	-	-
 ```
 
 tab-separated output file contain summary of every predicted MGE:

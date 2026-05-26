@@ -252,8 +252,8 @@ class Recovery:
         self.expanded_left = left_trna if left_trna else self.left_gene
         self.expanded_right = right_trna if right_trna else self.right_gene
 
-        self.DR1 = self.left_gene.start if self.left_direction == '+' else self.final_left.end
-        self.DR4 = self.right_gene.end if self.right_direction == '+' else self.final_right.start
+        self.DR1 = self.left_gene.start if self.left_direction == '+' else self.left_gene.end
+        self.DR4 = self.right_gene.end if self.right_direction == '+' else self.right_gene.start
 
         for record in SeqIO.parse(assembly_info.sample_path, 'fasta'):
             if record.id == next(iter(self.left_contig.keys())):

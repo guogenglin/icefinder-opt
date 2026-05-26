@@ -440,7 +440,7 @@ def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir:
     '''
     The main function for single genome analysis.
     '''
-    # Despite I already changed the ICE distance from 20 to 40, but the inner pending expand still be 20 to aviod noise.
+    # Although I already changed the ICE distance from 20 to 40, but the inner pending expand still be 20 to aviod noise.
     # ── Step 1: Annotate the assembly and get gene information ────────────────────────────────
     assembly_info = Assembly(input_file, input_file.stem, check_file(input_file), 'TMPID')
     # treat fasta and genbank differerntly to collect the gene details

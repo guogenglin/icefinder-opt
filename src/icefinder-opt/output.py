@@ -168,7 +168,7 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
 
             if not final_dir.exists():
                 final_dir.mkdir(parents = True)
-            _, amr_list = abricate(final_dir / f'{ICE_result.ICE_name}.fa', 'resfinder')
+            _, amr_list = abricate(final_dir / f'{ICE_result.ICE_name}.fasta', 'resfinder')
             ICE_amr = (';').join(amr_list) if amr_list else '-'        
 
             if not ICE_result.all_middle:

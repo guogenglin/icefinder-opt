@@ -339,7 +339,7 @@ class TypingResults:
         Extract basic information about the predicted ICE, including sequence, GC content, and direct repeats.
         '''
         self.ICE_name = f'{assembly_info.sample_name}_{self.sys_id}'   # eg. aHPS7_ICE1
-        self.ICE_ID = f'>{assembly_info.sample_name}_{self.contig}_{self.DR1}-{self.DR4}'
+        self.ICE_ID = f'{assembly_info.sample_name}_{self.contig}_{self.DR1}-{self.DR4}'
         self.seq = getfa(assembly_info.sample_path, self.contig, self.DR1, self.DR4)
         self.gc = f'{gc_fraction(self.seq) * 100:.2f}'
         if self.DR2: # pending if there is a attL

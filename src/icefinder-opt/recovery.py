@@ -281,7 +281,7 @@ class Recovery:
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end # left match
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)   # right do not bias too match
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
-                            and self.expanded_left.start - int(DRs[0]) <= 10000)):
+                            and -10000 <= self.expanded_left.start - int(DRs[0]) <= 10000)):
                         self.DR1 = int(DRs[0]) + 1
                         self.DR2 = int(DRs[1])
                         self.DR3 = int(DRs[2]) - len_left_seq + 1
@@ -289,11 +289,12 @@ class Recovery:
                         self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
                         self.left_seq = self.left_seq[self.DR1:]
                         self.right_seq = self.right_seq[:self.DR4 - len_left_seq]
+
                 elif self.left_direction == '-' and self.right_direction == '+':
                     if (((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start) 
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
-                            and len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
+                            and -10000 <= len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
                             self.DR1 = len_left_seq - int(DRs[1])
                             self.DR2 = len_left_seq - int(DRs[0]) + 1
                             self.DR3 = int(DRs[2]) - len_left_seq + 1
@@ -305,7 +306,7 @@ class Recovery:
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
                          and -10000 <= int(DRs[3]) - len_left_seq - len_right_seq + self.expanded_right.end <= 10000)
                         or self.expanded_right.start <= (len_right_seq - int(DRs[3]) + len_left_seq) <= self.expanded_right.end 
-                        and self.expanded_left.start - int(DRs[0]) <= 10000):
+                        and -10000 <= self.expanded_left.start - int(DRs[0]) <= 10000):
                             self.DR1 = int(DRs[0]) + 1
                             self.DR2 = int(DRs[1])
                             self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1
@@ -350,7 +351,7 @@ class Recovery:
         
         self.ICE_location = [left_loc]
 
-        outfa = final_dir / f'{self.ICE_name}.fa'
+        outfa = final_dir / f'{self.ICE_name}.fasta'
 
         with open(outfa, 'w') as out_handle:
                 SeqIO.write(SeqRecord(self.left_seq, id = left_ID, description=''), out_handle, 'fasta')
@@ -362,6 +363,7 @@ class Recovery:
         with open(outfa, 'a') as out_handle:
             for record in SeqIO.parse(assembly_info.sample_path, 'fasta'):
                 if record.id in self.all_middle:
+                    record.description = ''
                     SeqIO.write(record, out_handle, 'fasta')
                     all_seq += record.seq
 

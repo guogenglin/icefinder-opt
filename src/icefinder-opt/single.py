@@ -267,6 +267,7 @@ def remove_duplicate(assembly_info: Assembly, MGE_results: dict, recovery_MGEs: 
     # But in the rest of the script, we will only consider ICEs for further analysis
     new_recovery_MGEs = {}
 
+    # if any recovery_result is subset of normal result, remove
     for mge_name, results in recovery_MGEs.items():
         if 'IME' in mge_name:
             if any('ICE' in key for key in MGE_results) or any('IME' in key for key in MGE_results):
@@ -288,15 +289,19 @@ def remove_duplicate(assembly_info: Assembly, MGE_results: dict, recovery_MGEs: 
                 new_recovery_MGEs[mge_name] = results
         else:
             # The rest is ICEs, and the name should be 'T4SS_typeB' or similar
-            if any('ICE' in key for key in MGE_results):
+            if any('T4SS' in key for key in MGE_results):
                 mge_locus_sets = [{element.locus_num for element in tr.elements}
                                 for tr in MGE_results.values()]
-                if not any({hit.locus_num for hit in results}.issubset(locus_set)
-                        for locus_set in mge_locus_sets):
+                re_sets = {hit.locus_num for hit in results}
+
+                no_subset_relation = not any(re_sets.issubset(locus_set) for locus_set in mge_locus_sets)
+                no_superset_relation = not any(locus_set.issubset(re_sets) for locus_set in mge_locus_sets)
+
+                if no_subset_relation and no_superset_relation:
                     new_recovery_MGEs[mge_name] = results
             else:
                 new_recovery_MGEs[mge_name] = results
-
+    # if any IME is a part of recovery ICE, remove
     if any('T4SS' in key for key in recovery_MGEs) and (
         any('IME' in key for key in MGE_results)):
 
@@ -312,7 +317,7 @@ def remove_duplicate(assembly_info: Assembly, MGE_results: dict, recovery_MGEs: 
         ]
         for key in remove_keys:
             MGE_results.pop(key)
-
+    # sometimes recovery ICE could be mispend as normal ICE, should be reclassified to recovery dict
     remove_keys = set()
     for MGE_name, MGE_result in MGE_results.items():
         hit_id = set([element.locus_num for element in MGE_result.elements])
@@ -332,7 +337,7 @@ def remove_duplicate(assembly_info: Assembly, MGE_results: dict, recovery_MGEs: 
             remove_keys.add(MGE_name)
     for key in remove_keys:
             MGE_results.pop(key)
-
+    # sometimes one sequence could be recongized as two different type of ICE
     remove_keys = set()
     for (MGE_name1, MGE_result1), (MGE_name2, MGE_result2) in combinations(MGE_results.items(), 2):
 
@@ -401,7 +406,7 @@ def boundary_of_rICE(assembly_info: Assembly, recovery_MGEs: dict[str, list[MacS
             recovery_ICEs.pop(key)
     
     remove_keys = set()
-
+    # in case there are duplicate of rICE
     for (rICE_name1, rICE_result1), (rICE_name2, rICE_result2) in combinations(recovery_ICEs.items(), 2):
 
         if rICE_name1 in remove_keys or rICE_name2 in remove_keys:

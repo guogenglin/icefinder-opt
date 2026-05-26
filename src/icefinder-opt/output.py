@@ -73,6 +73,19 @@ def generate_comp_output(assembly_info: Assembly, MGE_results: dict[str, TypingR
     
     shutil.copytree(jsback, js_dir, dirs_exist_ok = True)
 
+def final_refine(recovery_ICEs: dict[str, Recovery], MGE_results: dict[str, TypingResults]) -> dict[str, Recovery]:
+    remove_keys = set()
+    for recovery_name, recovery_ICE in recovery_ICEs.items():
+        middle_contigs = [middle_contig for middle_contig in recovery_ICE.middle_contig]
+        for MGE_result in MGE_results.values():
+            if MGE_result.contig in middle_contigs:
+                remove_keys.add(recovery_name)
+                continue
+    for key in remove_keys:
+        recovery_ICEs.pop(key)
+
+    return recovery_ICEs
+
 def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResults], temp_dir: Path, 
                     recovery_ICEs: dict[str, Recovery], rootdir: Path, output_dir: Path, threads: int, 
                     verbose: bool = False):
@@ -140,6 +153,7 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
     
     rICE_count = 0
     if recovery_ICEs:
+        recovery_ICEs = final_refine(recovery_ICEs, MGE_results)
         for rICE_name, ICE_result in recovery_ICEs.items():
             # info: [DR1, DR2, DR3, DR4, final_left, final_right, end0_last, end1_last, trnalist, left_contig, right_contig]
             rICE_count += 1

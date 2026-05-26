@@ -60,19 +60,19 @@ def direction_pending(edge_contigs: dict[str, list[MacSyHit]], assembly_info: As
     a_locus = [hit.locus_num for hit in next(iter(a_contig.values()))]
     b_locus = [hit.locus_num for hit in next(iter(b_contig.values()))]
 
-    if max(a_target) - max(a_locus) > EXPAND and min(b_locus) - min(b_target) > EXPAND:
+    if max(a_target) - max(a_locus) >= EXPAND and min(b_locus) - min(b_target) >= EXPAND:
         a_gene = next(gene for gene in assembly_info.contigs[next(iter(a_contig))].genes.values() if gene.locus_num == max(a_locus))
         b_gene = next(gene for gene in assembly_info.contigs[next(iter(b_contig))].genes.values() if gene.locus_num == min(b_locus))
         return b_contig, '+', b_gene, a_contig, '+', a_gene
-    elif max(b_target) - max(b_locus) > EXPAND and min(a_locus) - min(a_target) > EXPAND:
+    elif max(b_target) - max(b_locus) >= EXPAND and min(a_locus) - min(a_target) >= EXPAND:
         a_gene = next(gene for gene in assembly_info.contigs[next(iter(a_contig))].genes.values() if gene.locus_num == min(a_locus))
         b_gene = next(gene for gene in assembly_info.contigs[next(iter(b_contig))].genes.values() if gene.locus_num == max(b_locus))
         return a_contig, '+', a_gene, b_contig, '+', b_gene
-    elif max(a_target) - max(a_locus) > EXPAND and max(b_target) - max(b_locus) > EXPAND:
+    elif max(a_target) - max(a_locus) >= EXPAND and max(b_target) - max(b_locus) >= EXPAND:
         a_gene = next(gene for gene in assembly_info.contigs[next(iter(a_contig))].genes.values() if gene.locus_num == max(a_locus))
         b_gene = next(gene for gene in assembly_info.contigs[next(iter(b_contig))].genes.values() if gene.locus_num == max(b_locus))
         return a_contig, '-', a_gene, b_contig, '+', b_gene
-    elif min(a_locus) - min(a_target) > EXPAND and min(b_locus) - min(b_target) > EXPAND:
+    elif min(a_locus) - min(a_target) >= EXPAND and min(b_locus) - min(b_target) >= EXPAND:
         a_gene = next(gene for gene in assembly_info.contigs[next(iter(a_contig))].genes.values() if gene.locus_num == min(a_locus))
         b_gene = next(gene for gene in assembly_info.contigs[next(iter(b_contig))].genes.values() if gene.locus_num == min(b_locus))
         return a_contig, '+', a_gene, b_contig, '-', b_gene

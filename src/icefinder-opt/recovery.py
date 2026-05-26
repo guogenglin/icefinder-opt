@@ -282,7 +282,6 @@ class Recovery:
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)   # right do not bias too match
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
                             and self.expanded_left.start - int(DRs[0]) <= 10000)):
-                        print(DRs)
                         self.DR1 = int(DRs[0]) + 1
                         self.DR2 = int(DRs[1])
                         self.DR3 = int(DRs[2]) - len_left_seq + 1

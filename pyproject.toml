@@ -1,0 +1,20 @@
+[build-system]
+requires = ['setuptools>=68']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'icefinder-opt'
+version = '1.1.0'
+description = 'icefinder-opt: A modified version of ICEfinder2, which fixes several bugs and adds new functionalities'
+readme = 'README.md'
+requires-python = '>=3.11'
+license = {file = 'LICENSE'}
+authors = [
+    {name = 'Genglin Guo', email = '2019207025@njau.edu.cn'},
+]
+
+dependencies = ['biopython', 'minimap2', 'mash', 'defense-finder', 'blastp', 'blastn', 'prodigal', 'prokka', 
+                'macsyfinder', 'hmmsearch', 'vmatch', 'abricate', 'mob_recon']
+
+[project.scripts]
+icefinder-opt = 'icefinder-opt.cli:main'

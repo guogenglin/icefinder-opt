@@ -79,9 +79,7 @@ In the future, using Prodigal alone may further accelerate this process.
 ## Scope of this version
 The original ICEfinder2 includes two functionalities: predicting MGEs in single bacterial genomes and in metagenomic datasets.
 
-In this version, the focus is on single-genome analysis.
-
-The original metagenome scripts are still included, but they have only minimal modifications to maintain the original functionality.
+In this version, the focus is on single-genome analysis. I will introduce more about metagenome ICE prediction funcion later.
 
 ## Virulence and antimicrobial resistance gene prediction
 The original tool used the BLAST databases provided by the authors.
@@ -137,7 +135,9 @@ Parameters:
 ```
 
 ## Metagenome
-For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. I will rewrite this part further.
+For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. 
+
+The logic of original ICEfinder2 for metagenoma ICE prediction is basicly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence, just ignore those recovery result, which could get you the same results (maybe more accurate).
 
 ## Other options
 ```

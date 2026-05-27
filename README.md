@@ -48,6 +48,8 @@ In the new version, I have temporarily adjusted this threshold to 30. In the fut
 
 HAHA, 30 is still not enough, so I have changed to 40. Based on my current tests, increasing the intergenic distance threshold does not affect prediction accuracy; however, an insufficient threshold may lead to ICE being incorrectly predicted as IME.
 
+Increase inter_gene_max_space will also increase the miss pending of middle part of ICEs separated into different contigs, so, for ICEs fall in one single contigs, 40 gene was used as threashold, for predict ICE from multiple contigs, we still use 20 gene as threshold to limit the bias.
+
 ## Batch processing support
 The local version of ICEfinder2 could only process one sample at a time.
 
@@ -79,7 +81,7 @@ In the future, using Prodigal alone may further accelerate this process.
 ## Scope of this version
 The original ICEfinder2 includes two functionalities: predicting MGEs in single bacterial genomes and in metagenomic datasets.
 
-In this version, the focus is on single-genome analysis. I will introduce more about metagenome ICE prediction funcion later.
+In this version, the focus is on single-genome analysis. I will explain about metagenome ICE prediction function below.
 
 ## Virulence and antimicrobial resistance gene prediction
 The original tool used the BLAST databases provided by the authors.
@@ -97,7 +99,7 @@ This is because ICE detection is pattern-based, not sequence-alignment-based.
 
 If an ICE is split across multiple contigs (common for large ICEs, tens of kb in length, often composed of integrases and IS elements), predictions in the middle of ICEs may be less accurate.
 
-The ICE predicted that located in 2 and more contigs will be marked a `r` as the prefix, for example, aHPS7_rICE1.
+The ICE predicted that located in 2 and more contigs will be marked a `r` as the prefix, for example, aHPS7_rICE_1.
 
 ## Visualization limitations
 Genetic maps of ICEs that are split across contigs will not be drawn, but antimicrobial resistance genes within these ICEs will still be predicted.
@@ -135,9 +137,9 @@ Parameters:
 ```
 
 ## Metagenome
-For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. 
+For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. (maybe I will not rewrite this part in future, because it seems not very nessesary., below is the reason.)
 
-The logic of original ICEfinder2 for metagenoma ICE prediction is basicly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence, just ignore those recovery result, which could get you the same results (maybe more accurate).
+The logic of original ICEfinder2 for metagenoma ICE prediction is basicly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence, just ignore those recovery result, which could get you the same results (maybe more accurate). The only disadvantage is species identification by kraken, while you can run kraken later just on those sequences you already know they are contain ICEs, which maybe faster. (catch the record.id from ICE_detail.tsv, use biopython extract the certain sequence, then process by kraken)
 
 ## Other options
 ```
@@ -174,7 +176,7 @@ tab-separated output file contain details of every predicted MGE:
 Column | Example | Description
 -------|---------|------------
 Isolate | `aHPS7` | The name of the inputfile
-MGE | `aHPS7_ICE1` | The name of the predicted MGE
+MGE | `aHPS7_ICE_1` | The name of the predicted MGE
 Location | `NZ_CP049090.1:1353271..1421762` | The location of the predicted MGE
 Length | `68492` | Length of the predicted MGE
 GC | `37.86` | GC content of the predicted MGE (%)
@@ -192,15 +194,15 @@ middle_probability | `-` | Confidence for the prediction that a given middle reg
 for example:
 ```
 Isolate	MGE	Location	Length	GC	Relaxase_Type	Systems	oriT	attL	attR	att_seq	tRNA	AMR	middle
-1082_KOXY	1082_KOXY_ICE1	NZ_JWDP01000035.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
-1082_KOXY	1082_KOXY_ICE2	NZ_JWDP01000172.1:(16845..43731)	26887	49.51	MOBH	typeG	-	16845..16859	43717..43731	AACCGTAGAAATACG	tRNA-Leu(caa),NZ_JWDP01000172.1:16804..16888[+]	-	-
-1082_KOXY	1082_KOXY_IME2	NZ_JWDP01000026.1:(2219..10245)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
-1084_KOXY	1084_KOXY_ICE1	NZ_JWDN01000042.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
-1084_KOXY	1084_KOXY_ICE2	NZ_JWDN01000183.1:(16816..39690)	22875	48.16	MOBH	typeG	-	16816..16830	39676..39690	AAATCGGTAGACGCA	tRNA-Leu(caa),NZ_JWDN01000183.1:16804..16888[+]	-	-
-1085_KOXY	1085_KOXY_ICE1	NZ_JWDM01000043.1:(16801..47867)	31067	49.00	MOBH	typeG	-	16801..16815	47853..47867	TGGCGAAATCGGTAG	tRNA-Leu(caa),NZ_JWDM01000043.1:16794..16878[+]	-	-
-1085_KOXY	1085_KOXY_IME1	NZ_JWDM01000060.1:(5435..13461)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
-1085_KOXY	1085_KOXY_ICE2	NZ_JWDM01000157.1:(3747..24973)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
-109680-17	109680-17_ICE1	NZ_VNMN01000028.1:(23715..55638)	31924	53.00	MOBF	typeF	-	-	-	-	-	-	-
+1082_KOXY	1082_KOXY_ICE_1	NZ_JWDP01000035.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+1082_KOXY	1082_KOXY_ICE_2	NZ_JWDP01000172.1:(16845..43731)	26887	49.51	MOBH	typeG	-	16845..16859	43717..43731	AACCGTAGAAATACG	tRNA-Leu(caa),NZ_JWDP01000172.1:16804..16888[+]	-	-
+1082_KOXY	1082_KOXY_IME_2	NZ_JWDP01000026.1:(2219..10245)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
+1084_KOXY	1084_KOXY_ICE_1	NZ_JWDN01000042.1:(3757..24983)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+1084_KOXY	1084_KOXY_ICE_2	NZ_JWDN01000183.1:(16816..39690)	22875	48.16	MOBH	typeG	-	16816..16830	39676..39690	AAATCGGTAGACGCA	tRNA-Leu(caa),NZ_JWDN01000183.1:16804..16888[+]	-	-
+1085_KOXY	1085_KOXY_ICE_1	NZ_JWDM01000043.1:(16801..47867)	31067	49.00	MOBH	typeG	-	16801..16815	47853..47867	TGGCGAAATCGGTAG	tRNA-Leu(caa),NZ_JWDM01000043.1:16794..16878[+]	-	-
+1085_KOXY	1085_KOXY_IME_1	NZ_JWDM01000060.1:(5435..13461)	8027	39.77	MOBQ	-	-	-	-	-	-	-	-
+1085_KOXY	1085_KOXY_ICE_2	NZ_JWDM01000157.1:(3747..24973)	21227	57.24	MOBP1	typeI	-	-	-	-	-	-	-
+109680-17	109680-17_ICE_1	NZ_VNMN01000028.1:(23715..55638)	31924	53.00	MOBF	typeF	-	-	-	-	-	-	-
 ```
 
 tab-separated output file contain summary of every predicted MGE:

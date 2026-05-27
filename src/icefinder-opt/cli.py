@@ -25,7 +25,7 @@ warnings.simplefilter("ignore", BiopythonDeprecationWarning)
 from .log import formatted_description, bold, ICEfinderError, log
 from .utils import check_cpus, check_programs_shutil
 from .single import assembly_prediction
-from .metaICE import _meta
+from .metaICE import meta_prediction
 
 __version__ = '1.1.0'
 
@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None):
     elif args.subparser_name == 'metagenome':
         for input_file in args.input:
             with tempfile.TemporaryDirectory() as temp_dir:
-                _meta(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
+                meta_prediction(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
     else:
         raise ICEfinderError('Invalid mode. Please choose either "assembly" or "metagenome".')
     

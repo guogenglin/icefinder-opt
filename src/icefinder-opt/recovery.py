@@ -80,7 +80,7 @@ def direction_pending(edge_contigs: dict[str, list[MacSyHit]], assembly_info: As
         raise ICEfinderError('No valid direction found')
     
 def search_trna(edge_contig: dict[str, list[MacSyHit]], edge_gene: Gene, edge_direction: str, 
-                assembly_info: Assembly, flanking: str, EXPAND: int = 20) -> Gene:
+                assembly_info: Assembly, flanking: str, EXPAND: int = 20) -> Gene | None:
     '''
     Search for tRNA genes in the flanking regions of the ICE and return the list of tRNA genes and the final edge gene after merging with tRNA.
     '''

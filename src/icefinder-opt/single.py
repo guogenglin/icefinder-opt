@@ -191,7 +191,7 @@ def check_recoveries(recovery_MGEs: dict[str, list[MacSyHit]]) -> dict[str, list
         # build graph
         for i in range(n):
             for j in range(i + 1, n):
-                if is_connected(MGE_hits[i], MGE_hits[j], 10 if 'T4SS' not in MGE_type else 30):
+                if is_connected(MGE_hits[i], MGE_hits[j], 10 if 'T4SS' not in MGE_type else 20):   # for recovery, the distance should be more strict
                     uf.union(i, j)
 
         # group clusters

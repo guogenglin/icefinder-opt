@@ -72,7 +72,7 @@ class Gene:
     Represents a gene in a genomic sequence.
     '''
     def __init__(self, gene_id : str, origin_id : str, start: int, end: int, strand: str, product: str, 
-                 trna: str = 'F', feature: list[str] | None = None, product_map: list[str] | None = None):
+                 trna: str = 'F', feature: str | None = None, product_map: list[str] | None = None):
         self.gene_id        = gene_id
         self.origin_id      = origin_id
         self.start          = start
@@ -80,7 +80,7 @@ class Gene:
         self.strand         = strand
         self.product        = product
         self.trna           = trna
-        self.feature        = feature or []
+        self.feature        = feature or ''
         self.product_map    = product_map or []
 
     @property

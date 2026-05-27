@@ -17,7 +17,7 @@ from .utils import gene_key, process_gene
 from .log import log
 
 
-def getcolor(feature: list[str], product: list[str]) -> tuple[str, str]:
+def getcolor(feature: str, product: list[str]) -> tuple[str, str]:
     
     coldict = {
         'DR': 'black', 'Gene': '#C0C0C0', 'Hyp': '#DCDCDC',

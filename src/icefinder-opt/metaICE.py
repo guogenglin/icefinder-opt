@@ -7,7 +7,7 @@ import json
 import shutil
 import subprocess
 from Bio import SeqIO
-# from ete3 import NCBITaxa
+from ete3 import NCBITaxa
 from Bio.SeqUtils import gc_fraction
 # from script.function import getblast
 
@@ -905,7 +905,7 @@ def getfasta(runID,resultdir,id_dict,key,s,e,stag,etag):
             if int(stag) <= seq_id <= int(etag):
                 SeqIO.write(faa_record, output_handle2, "fasta")
 
-def _meta(runID, input_file, threads):
+def meta_prediction(runID, output_dir, threads):
     
     resultdir = workdir / 'result' / runID
     resultdir.mkdir(parents=True, exist_ok=True)

@@ -233,7 +233,7 @@ class Recovery:
             edge_contigs, assembly_info, EXPAND)
 
         return (cls(middle_contig, left_contig, right_contig, left_direction, right_direction, 
-                    left_gene, right_gene, mpf, mob, all_gene_num))
+                    left_gene, right_gene, mob, mpf, all_gene_num))
 
                    
     def merge_tRNA(self, assembly_info: Assembly, temp_dir: Path, EXPAND: int = 20):

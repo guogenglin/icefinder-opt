@@ -74,6 +74,7 @@ def check_programs_shutil(progs: list[str], verbose: bool = False):
             print(f'{prog}: {path}')
         else:
             missing.append(prog)
+    print('\n')
     if not missing:
         log(f'All required programs found: {", ".join(progs)}', verbose = verbose)
     if missing:

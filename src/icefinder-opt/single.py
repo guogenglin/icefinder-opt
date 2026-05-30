@@ -327,7 +327,7 @@ def remove_duplicate(assembly_info: Assembly, MGE_results: dict, recovery_MGEs: 
                 break
         if MGE_result.category == 'ICE' and not MGE_result.contig:
             for mpf in MGE_result.mpf:
-                new_tag = f'T4SS_{next(iter(mpf))}'
+                new_tag = f'T4SS_{mpf}'
                 if new_tag not in new_recovery_MGEs:
                     new_recovery_MGEs[new_tag] = []
                 for i in MGE_result.elements:

@@ -212,7 +212,6 @@ class Recovery:
             mpf.add(mge_name.split('_')[1])
             if 'Relaxase@' in tags:
                 mob.add(tags.split('@')[1])
-
         middle_contig, edge_contigs, all_gene_num = {}, {}, set()
         for contig, locus_list in contig_locus.items():
             target = [gene.locus_num for gene in assembly_info.contigs[contig].genes.values()]

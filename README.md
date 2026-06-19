@@ -139,7 +139,7 @@ Parameters:
 ## Metagenome
 For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. (maybe I will not rewrite this part in future, because it seems not very nessesary., below is the reason.)
 
-The logic of original ICEfinder2 for metagenoma ICE prediction is basicly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence, just ignore those recovery result, which could get you the same results (maybe more accurate). The only disadvantage is species identification by kraken, while you can run kraken later just on those sequences you already know they are contain ICEs, which maybe faster. (catch the record.id from ICE_detail.tsv, use biopython extract the certain sequence, then process by kraken)
+The logic of original ICEfinder2 for metagenoma ICE prediction basicaly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence and ignore those recovery result, it could get you the same results (maybe more accurate). The only disadvantage is species identification by kraken, while you can run kraken later just on those sequences you already know they are contain ICEs, which maybe faster. (catch the record.id from ICE_detail.tsv, use biopython extract the certain sequence, then process by kraken; also, kraken is a little bit heavy for individual users)
 
 ## Other options
 ```

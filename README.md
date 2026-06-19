@@ -48,7 +48,7 @@ In the new version, I have temporarily adjusted this threshold to 30. In the fut
 
 HAHA, 30 is still not enough, so I have changed to 40. Based on my current tests, increasing the intergenic distance threshold does not affect prediction accuracy; however, an insufficient threshold may lead to ICE being incorrectly predicted as IME.
 
-Increase inter_gene_max_space will also increase the miss pending of middle part of ICEs separated into different contigs, so, for ICEs fall in one single contigs, 40 gene was used as threashold, for predict ICE from multiple contigs, we still use 20 gene as threshold to limit the bias.
+Increase inter_gene_max_space will also increase the miss pending of middle part of ICEs separated into different contigs, so, for ICEs fall in one single contigs, 40 gene was used as threashold, for predict ICE from multiple contigs, I still set 20 gene as threshold to limit the bias.
 
 ## Batch processing support
 The local version of ICEfinder2 could only process one sample at a time.

@@ -388,7 +388,9 @@ def MGE_reorder(MGE_results: dict[str, TypingResults], verbose: bool = False) ->
 
 def boundary_of_rICE(assembly_info: Assembly, recovery_MGEs: dict[str, list[MacSyHit]], temp_dir: Path, 
                      verbose: bool = False, EXPAND = 20) -> dict[str, Recovery]:
-
+    '''
+    Determine the boundary of recovered ICEs and merge tRNA information.
+    '''
     recovery_ICEs = {}   # eg. {T4SS_typeG : Recovery}
     recount = 0
     for mge_name, mge_result in recovery_MGEs.items():

@@ -18,7 +18,9 @@ from .log import log
 
 
 def getcolor(feature: str, product: list[str]) -> tuple[str, str]:
-    
+    '''
+    Get the color and name of a gene based on its feature and product.
+    '''
     coldict = {
         'DR': 'black', 'Gene': '#C0C0C0', 'Hyp': '#DCDCDC',
         'Integrase': 'blue', 'Transposase': 'yellow',
@@ -69,7 +71,9 @@ def getcolor(feature: str, product: list[str]) -> tuple[str, str]:
     return coldict[feature], namedict[feature]
         
 def calculate_gc(seq: Seq, window_size = 500, step_size = 50) -> dict:
-
+    '''
+    Calculate the GC content of a sequence using a sliding window approach.
+    '''
     gc_contents = []
     pos = []
 
@@ -95,7 +99,9 @@ def calculate_gc(seq: Seq, window_size = 500, step_size = 50) -> dict:
 
 def get_map(assembly_info: Assembly, MGE_results: dict[str, TypingResults], rootdir: Path, temp_dir: Path, 
             output_dir: Path, threads: int, verbose: bool = False) -> tuple[Path, Path]:
-    
+    '''
+    Generate genetic maps for ICEs and save the results in the specified output directory.
+    '''
     final_dir = output_dir / assembly_info.sample_name
     final_dir.mkdir(parents = True, exist_ok = True)
     js_dir = final_dir / 'js'

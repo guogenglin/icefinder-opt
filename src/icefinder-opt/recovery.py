@@ -157,6 +157,7 @@ class UnionFind:
 
 
 class Recovery:
+    '''Class representing a recovered ICE with its associated information.'''
     def __init__(self, middle_contig: dict[str, list[MacSyHit]] | None = None, left_contig: dict[str, list[MacSyHit]] | None = None, 
                  right_contig: dict[str, list[MacSyHit]] | None = None, left_direction: str | None = None, 
                  right_direction: str | None = None, left_gene: Gene | None = None, right_gene: Gene | None = None, 

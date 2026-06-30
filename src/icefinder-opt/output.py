@@ -74,6 +74,9 @@ def generate_comp_output(assembly_info: Assembly, MGE_results: dict[str, TypingR
     shutil.copytree(jsback, js_dir, dirs_exist_ok = True)
 
 def final_refine(recovery_ICEs: dict[str, Recovery], MGE_results: dict[str, TypingResults]) -> dict[str, Recovery]:
+    '''
+    Refine the recovered ICEs by removing those that overlap with the predicted ICEs.
+    '''
     remove_keys = set()
     for recovery_name, recovery_ICE in recovery_ICEs.items():
         middle_contigs = [middle_contig for middle_contig in recovery_ICE.middle_contig]

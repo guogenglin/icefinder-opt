@@ -48,7 +48,7 @@ In the new version, I have temporarily adjusted this threshold to 30. In the fut
 
 HAHA, 30 is still not enough, so I have changed to 40. Based on my current tests, increasing the intergenic distance threshold does not affect prediction accuracy; however, an insufficient threshold may lead to ICE being incorrectly predicted as IME.
 
-Increase inter_gene_max_space will also increase the miss pending of middle part of ICEs separated into different contigs, so, for ICEs fall in one single contigs, 40 gene was used as threashold, for predict ICE from multiple contigs, we still use 20 gene as threshold to limit the bias.
+Increase inter_gene_max_space will also increase the miss pending of middle part of ICEs separated into different contigs, so, for ICEs fall in one single contigs, 40 gene was used as threashold, for predict ICE from multiple contigs, I still set 20 gene as threshold to limit the bias.
 
 ## Batch processing support
 The local version of ICEfinder2 could only process one sample at a time.
@@ -139,7 +139,7 @@ Parameters:
 ## Metagenome
 For now I just kept the original script of icefinder2 to keep the script complete, however, this part cannot be used. (maybe I will not rewrite this part in future, because it seems not very nessesary., below is the reason.)
 
-The logic of original ICEfinder2 for metagenoma ICE prediction is basicly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence, just ignore those recovery result, which could get you the same results (maybe more accurate). The only disadvantage is species identification by kraken, while you can run kraken later just on those sequences you already know they are contain ICEs, which maybe faster. (catch the record.id from ICE_detail.tsv, use biopython extract the certain sequence, then process by kraken)
+The logic of original ICEfinder2 for metagenoma ICE prediction basicaly is screen the ICE in every single metagenome sequences, plus with species identification by kraken, however, you can run assembly mode of icefinder-opt to process your metagenome sequence and ignore those recovery result, it could get you the same results (maybe more accurate). The only disadvantage is species identification by kraken, while you can run kraken later just on those sequences you already know they are contain ICEs, which maybe faster. (catch the record.id from ICE_detail.tsv, use biopython extract the certain sequence, then process by kraken; also, kraken is a little bit heavy for individual users)
 
 ## Other options
 ```

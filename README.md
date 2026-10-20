@@ -107,15 +107,11 @@ Genetic maps of ICEs that are split across contigs will not be drawn, but antimi
 ## Output changes
 The FAA format output has been removed; only FASTA files are retained.
 
-## Code quality and future improvements
-You may notice some duplicate code and complex, clunky logic in the scripts.
+# Dependencies and Installation
+`BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `defense-finder`, `mob_suite`, `biopython`, `python` >= 3.11
 
-Many areas could be improved for efficiency and readability.
-
-Contributions to make the code faster or cleaner are welcome!
-
-# Dependencies
-`BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `kraken`, `defense-finder`, `mob_suite`, `biopython`, `python` >= 3.11
+## Conda environment:
+The supplied [icefinder-opt.yml](icefinder-opt.yml) contains Linux-specific packages and build identifiers. Use it in Linux or inside WSL on Windows. So if you don't want to handle these dependencies by yourself, you can just use this yaml file to handle the environment.
 
 # Usage
 I designed icefinder-opt to be easier to use on the command-line by structuring the program as a series of sub-commands that follow the general pattern of:

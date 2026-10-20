@@ -1,4 +1,4 @@
-name: mge
+name: icefinder
 channels:
   - conda-forge
   - bioconda

@@ -113,6 +113,11 @@ The FAA format output has been removed; only FASTA files are retained.
 ## Conda environment:
 The supplied [icefinder-opt.yml](icefinder-opt.yml) contains Linux-specific packages and build identifiers. Use it in Linux or inside WSL on Windows. So if you don't want to handle these dependencies by yourself, you can just use this yaml file to handle the environment.
 
+```
+conda env create -f icefinder-opt.yml
+conda activate icefinder
+```
+
 # Usage
 I designed icefinder-opt to be easier to use on the command-line by structuring the program as a series of sub-commands that follow the general pattern of:
 ```

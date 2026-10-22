@@ -34,10 +34,10 @@ def prokkanno(assembly_info: Assembly, temp_dir: Path, threads: int, verbose: bo
     '''
     Annotate the fasta sequence by prokka.
     '''
-    cmd = ['prokka', assembly_info.sample_path.name, '--force', '--cpus', str(threads), '--cdsrnaolap', '--prefix', 
-           assembly_info.sample_name, '--locustag', assembly_info.temp_id, '-o', 
+    cmd = ['prokka', str(assembly_info.sample_path.resolve()), '--force', '--cpus', str(threads), '--cdsrnaolap', 
+           '--prefix', assembly_info.sample_name, '--locustag', assembly_info.temp_id, '-o', 
            str(temp_dir / assembly_info.sample_name)]
-    subprocess.run(cmd, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+    subprocess.run(cmd, check = True)
 
     assembly_info.gff_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.gff'
     assembly_info.gbk_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.gbk'

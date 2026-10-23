@@ -237,12 +237,18 @@ def abricate(faa_file: Path, db: str) -> tuple[dict[str, str], list[str]]:
     Run abricate to predict AMR genes and return a dictionary of gene_id to AMR type and a list of gene_ids.
     '''
     command = ['abricate', '-db', db, str(faa_file)]
-    process = subprocess.run(command, capture_output = True, text = True, check = True)
+    try:
+        process = subprocess.run(command, capture_output = True, text = True, check = True)
+    except subprocess.CalledProcessError as exc:
+        raise ICEfinderError(
+            f'ABRicate failed for {faa_file} (database {db}, exit code {exc.returncode}):\n'
+            f'{exc.stderr.strip()}'
+        ) from exc
 
     blast_filter = {}
     gene_list = []
     for line in process.stdout.strip().split('\n'):
-        if not line.startswith('#'):
+        if line.strip() and not line.startswith('#'):
             lines = line.strip().split('\t')
             blast_filter[lines[1]] = lines[5]
             gene_list.append(lines[5].rsplit('_', 1)[0])

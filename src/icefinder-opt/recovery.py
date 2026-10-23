@@ -264,30 +264,37 @@ class Recovery:
                 break
         len_left_seq = len(self.left_seq)
         len_right_seq = len(self.right_seq)
+        left_source, right_source = self.left_seq, self.right_seq
         self.left_slice = slice(None)
         self.right_slice = slice(None)
 
         def trim_ends(left: slice, right: slice):
-            # Compose slices if multiple DR candidates trim the current sequences.
-            left_range = range(len_left_seq)[self.left_slice][left]
-            right_range = range(len_right_seq)[self.right_slice][right]
-            self.left_slice = slice(left_range.start, left_range.stop)
-            self.right_slice = slice(right_range.start, right_range.stop)
-            self.left_seq = self.left_seq[left]
-            self.right_seq = self.right_seq[right]
+            # Vmatch coordinates always refer to the original concatenated contigs.
+            # Each candidate replaces the previous boundary, rather than trimming it again.
+            self.left_slice, self.right_slice = left, right
+            self.left_seq = left_source[left]
+            self.right_seq = right_source[right]
+
+        # Retain gene-based boundaries if no flanking repeat is found.
+        trim_ends(slice(self.DR1 if self.left_direction == '+' else len_left_seq - self.DR1, None),
+                  slice(None, self.DR4 if self.right_direction == '+' else len_right_seq - self.DR4))
 
         if self.trnalist:
             temp_DR = temp_dir / 'detect_DR.fasta'
 
             with open(temp_DR , 'w') as handle:
                 handle.write('>temp_DR\n')
-                handle.write(str(self.left_seq))
-                handle.write(str(self.right_seq))
+                handle.write(str(left_source))
+                handle.write(str(right_source))
             
             rDRlist = get_DR(temp_DR, temp_dir)   # in case the direct of contig is wrong
 
             for DR in rDRlist:
                 DRs = DR.split(',')
+                # Both repeat copies must lie on opposite sides of the contig join.
+                if not (0 <= int(DRs[0]) < int(DRs[1]) <= len_left_seq
+                        <= int(DRs[2]) < int(DRs[3]) <= len_left_seq + len_right_seq):
+                    continue
                 if self.left_direction == '+' and self.right_direction == '+':
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end # left match
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)   # right do not bias too match
@@ -298,19 +305,19 @@ class Recovery:
                         self.DR3 = int(DRs[2]) - len_left_seq + 1
                         self.DR4 = int(DRs[3]) - len_left_seq
                         self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
-                        trim_ends(slice(self.DR1, None), slice(None, self.DR4 - len_left_seq))
+                        trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
 
                 elif self.left_direction == '-' and self.right_direction == '+':
                     if (((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start) 
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
                             and -10000 <= len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
-                            self.DR1 = len_left_seq - int(DRs[1])
-                            self.DR2 = len_left_seq - int(DRs[0]) + 1
+                            self.DR1 = len_left_seq - int(DRs[1]) + 1
+                            self.DR2 = len_left_seq - int(DRs[0])
                             self.DR3 = int(DRs[2]) - len_left_seq + 1
                             self.DR4 = int(DRs[3]) - len_left_seq
                             self.DR_seq = str(getfa(temp_DR, 'temp_DR', int(DRs[0]) + 1, int(DRs[1])))
-                            trim_ends(slice(int(DRs[0]) + 1, None), slice(None, self.DR4 - len_left_seq))
+                            trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
                 else:   # self.left_direction == '+' and self.right_direction == '-', there are only 3 posibility because of pending_direction
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
                          and -10000 <= int(DRs[3]) - len_left_seq - len_right_seq + self.expanded_right.end <= 10000)
@@ -321,18 +328,7 @@ class Recovery:
                             self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1
                             self.DR4 = len_right_seq - int(DRs[2]) + len_left_seq
                             self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
-                            trim_ends(slice(self.DR1, None), slice(None, int(DRs[3]) - len_left_seq))
-        else:
-            if self.left_direction == '+':
-                self.left_slice = slice(self.DR1, None)
-            else:
-                self.left_slice = slice(len_left_seq - self.DR1, None)
-            if self.right_direction == '+':
-                self.right_slice = slice(None, self.DR4)
-            else:
-                self.right_slice = slice(None, len_right_seq - self.DR4)
-            self.left_seq = self.left_seq[self.left_slice]
-            self.right_seq = self.right_seq[self.right_slice]
+                            trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
 
     def getrfasta(self, assembly_info: Assembly, rICE_count: int, output_dir: Path, temp_dir: Path, rootdir: Path, 
                   threads: int, verbose: bool = False, *, gbk_records: dict[str, SeqRecord] | None = None):
@@ -345,19 +341,16 @@ class Recovery:
         if not final_dir.exists():
             final_dir.mkdir(parents = True)
 
-        if self.left_direction == '+':
-            left_ID = f'{assembly_info.sample_name}_{next(iter(self.left_contig.keys()))}_{int(self.DR1)}-{assembly_info.contigs[next(iter(self.left_contig.keys()))].length}'
-            left_loc = f'{next(iter(self.left_contig.keys()))}:{int(self.DR1)}..{assembly_info.contigs[next(iter(self.left_contig.keys()))].length}'
-        else:
-            left_ID = f'{assembly_info.sample_name}_{next(iter(self.left_contig.keys()))}_1-{assembly_info.contigs[next(iter(self.left_contig.keys()))].length - self.DR1}'
-            left_loc = f'{next(iter(self.left_contig.keys()))}:1..{assembly_info.contigs[next(iter(self.left_contig.keys()))].length - self.DR1}'
-        
-        if self.right_direction == '+':
-            right_ID = f'{assembly_info.sample_name}_{next(iter(self.right_contig.keys()))}_1-{self.DR4}'
-            right_loc = f'{next(iter(self.right_contig.keys()))}:1..{self.DR4}'
-        else:
-            right_ID = f'{assembly_info.sample_name}_{next(iter(self.right_contig.keys()))}_{assembly_info.contigs[next(iter(self.right_contig.keys()))].length - self.DR4}_{assembly_info.contigs[next(iter(self.right_contig.keys()))].length}'
-            right_loc = f'{next(iter(self.right_contig.keys()))}:{assembly_info.contigs[next(iter(self.right_contig.keys()))].length - self.DR4}..{assembly_info.contigs[next(iter(self.right_contig.keys()))].length}'
+        def fragment_location(contig: str, region: slice, direction: str):
+            length = assembly_info.contigs[contig].length
+            start, stop, _ = region.indices(length)
+            if direction == '-':
+                start, stop = length - stop, length - start
+            return (f'{assembly_info.sample_name}_{contig}_{start + 1}-{stop}',
+                    f'{contig}:{start + 1}..{stop}')
+
+        left_ID, left_loc = fragment_location(next(iter(self.left_contig)), self.left_slice, self.left_direction)
+        right_ID, right_loc = fragment_location(next(iter(self.right_contig)), self.right_slice, self.right_direction)
         
         self.ICE_location = [left_loc]
 

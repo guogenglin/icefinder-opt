@@ -12,7 +12,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import gc_fraction
 
-from .utils import get_DR, getfa, oritseq
+from .utils import get_DR, getfa, oritseq, extract_gbk_region, load_gbk_records, write_matching_gbk
 from .alignment import MacSyHit, get_feature
 from .assembly import Assembly, Gene
 from .log import log, ICEfinderError
@@ -264,6 +264,17 @@ class Recovery:
                 break
         len_left_seq = len(self.left_seq)
         len_right_seq = len(self.right_seq)
+        self.left_slice = slice(None)
+        self.right_slice = slice(None)
+
+        def trim_ends(left: slice, right: slice):
+            # Compose slices if multiple DR candidates trim the current sequences.
+            left_range = range(len_left_seq)[self.left_slice][left]
+            right_range = range(len_right_seq)[self.right_slice][right]
+            self.left_slice = slice(left_range.start, left_range.stop)
+            self.right_slice = slice(right_range.start, right_range.stop)
+            self.left_seq = self.left_seq[left]
+            self.right_seq = self.right_seq[right]
 
         if self.trnalist:
             temp_DR = temp_dir / 'detect_DR.fasta'
@@ -287,8 +298,7 @@ class Recovery:
                         self.DR3 = int(DRs[2]) - len_left_seq + 1
                         self.DR4 = int(DRs[3]) - len_left_seq
                         self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
-                        self.left_seq = self.left_seq[self.DR1:]
-                        self.right_seq = self.right_seq[:self.DR4 - len_left_seq]
+                        trim_ends(slice(self.DR1, None), slice(None, self.DR4 - len_left_seq))
 
                 elif self.left_direction == '-' and self.right_direction == '+':
                     if (((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start) 
@@ -300,8 +310,7 @@ class Recovery:
                             self.DR3 = int(DRs[2]) - len_left_seq + 1
                             self.DR4 = int(DRs[3]) - len_left_seq
                             self.DR_seq = str(getfa(temp_DR, 'temp_DR', int(DRs[0]) + 1, int(DRs[1])))
-                            self.left_seq = self.left_seq[int(DRs[0]) + 1:]
-                            self.right_seq = self.right_seq[:self.DR4 - len_left_seq]
+                            trim_ends(slice(int(DRs[0]) + 1, None), slice(None, self.DR4 - len_left_seq))
                 else:   # self.left_direction == '+' and self.right_direction == '-', there are only 3 posibility because of pending_direction
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
                          and -10000 <= int(DRs[3]) - len_left_seq - len_right_seq + self.expanded_right.end <= 10000)
@@ -312,20 +321,21 @@ class Recovery:
                             self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1
                             self.DR4 = len_right_seq - int(DRs[2]) + len_left_seq
                             self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
-                            self.left_seq = self.left_seq[self.DR1:]
-                            self.right_seq = self.right_seq[:int(DRs[3]) - len_left_seq]
+                            trim_ends(slice(self.DR1, None), slice(None, int(DRs[3]) - len_left_seq))
         else:
             if self.left_direction == '+':
-                self.left_seq = self.left_seq[self.DR1:]
+                self.left_slice = slice(self.DR1, None)
             else:
-                self.left_seq = self.left_seq[len_left_seq - self.DR1:]
+                self.left_slice = slice(len_left_seq - self.DR1, None)
             if self.right_direction == '+':
-                self.right_seq = self.right_seq[:self.DR4]
+                self.right_slice = slice(None, self.DR4)
             else:
-                self.right_seq = self.right_seq[:len_right_seq - self.DR4]
+                self.right_slice = slice(None, len_right_seq - self.DR4)
+            self.left_seq = self.left_seq[self.left_slice]
+            self.right_seq = self.right_seq[self.right_slice]
 
     def getrfasta(self, assembly_info: Assembly, rICE_count: int, output_dir: Path, temp_dir: Path, rootdir: Path, 
-                  threads: int, verbose: bool = False):
+                  threads: int, verbose: bool = False, *, gbk_records: dict[str, SeqRecord] | None = None):
         '''
         Generate the fasta file for the recovery ICE, and also fill in the attributes of the Recovery object.
         '''
@@ -352,6 +362,11 @@ class Recovery:
         self.ICE_location = [left_loc]
 
         outfa = final_dir / f'{self.ICE_name}.fasta'
+        if gbk_records is None:
+            gbk_records = load_gbk_records(assembly_info.gbk_file)
+        annotated_records = [extract_gbk_region(
+            gbk_records, next(iter(self.left_contig)), self.left_slice, left_ID,
+            reverse=self.left_direction == '-')]
 
         with open(outfa, 'w') as out_handle:
                 SeqIO.write(SeqRecord(self.left_seq, id = left_ID, description=''), out_handle, 'fasta')
@@ -365,10 +380,16 @@ class Recovery:
                 if record.id in self.all_middle:
                     record.description = ''
                     SeqIO.write(record, out_handle, 'fasta')
+                    annotated_records.append(extract_gbk_region(
+                        gbk_records, record.id, slice(None), record.id))
                     all_seq += record.seq
 
             SeqIO.write(SeqRecord(self.right_seq, id = right_ID, description=''), out_handle, 'fasta')
             all_seq += self.right_seq
+        annotated_records.append(extract_gbk_region(
+            gbk_records, next(iter(self.right_contig)), self.right_slice, right_ID,
+            reverse=self.right_direction == '-'))
+        write_matching_gbk(annotated_records, outfa)
 
         orifa = temp_dir / f'{self.ICE_name}_fororit.fasta'
 
@@ -386,5 +407,5 @@ class Recovery:
             self.trnaout = (';').join(trnaout)
         self.length = len(all_seq)
 
-        log(f'{self.ICE_name} recovery fasta generated.', verbose = verbose)
+        log(f'{self.ICE_name} recovery FASTA and GenBank generated.', verbose = verbose)
 

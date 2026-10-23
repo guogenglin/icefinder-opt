@@ -15,12 +15,52 @@ import subprocess
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 from typing import Any
 from .log import log, ICEfinderError
 if TYPE_CHECKING:
     from .alignment import TypingResults
     from .assembly import Assembly, Gene
+
+
+def load_gbk_records(path: Path) -> dict[str, SeqRecord]:
+    '''Load the annotated contigs once for a sample.'''
+    with open(path) as handle:
+        return SeqIO.to_dict(SeqIO.parse(handle, 'genbank'))
+
+
+def extract_gbk_region(records: dict[str, SeqRecord], contig: str, region: slice,
+                       record_id: str, reverse: bool = False) -> SeqRecord:
+    '''Slice an annotated contig in its output orientation, retaining enclosed features.'''
+    if contig not in records:
+        raise ValueError(f'Contig {contig!r} is missing from the source GenBank file.')
+    source = records[contig]
+    oriented = source.reverse_complement(id=True, name=True, description=True) if reverse else source
+    result = oriented[region]
+    result.id = record_id
+    # Keep LOCUS short even when the FASTA identifier contains sample and coordinates.
+    result.name = 'MGE_region'
+    start, stop, _ = region.indices(len(source))
+    result.description = f'Region of {contig}, oriented slice [{start}:{stop}], strand {"-" if reverse else "+"}'
+    result.annotations = {
+        key: source.annotations[key]
+        for key in ('organism', 'taxonomy', 'source') if key in source.annotations
+    }
+    result.annotations.update(molecule_type='DNA', topology='linear')
+    return result
+
+
+def write_matching_gbk(records: list[SeqRecord], fasta_path: Path):
+    '''Verify record order and sequences before writing the matching GenBank file.'''
+    with open(fasta_path) as handle:
+        fasta_records = list(SeqIO.parse(handle, 'fasta'))
+    if len(records) != len(fasta_records):
+        raise ValueError(f'GenBank/FASTA record count mismatch for {fasta_path}.')
+    for annotated, fasta in zip(records, fasta_records):
+        if annotated.id != fasta.id or annotated.seq != fasta.seq:
+            raise ValueError(f'GenBank/FASTA mismatch for {fasta_path}: {fasta.id}.')
+    SeqIO.write(records, fasta_path.with_suffix('.gbk'), 'genbank')
 
 
 def check_cpus(cpus: Any = None, max_cpus: int = 32, verbose: bool = False) -> int:

@@ -12,7 +12,7 @@ from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
-from .utils import abricate
+from .utils import abricate, extract_gbk_region, load_gbk_records, write_matching_gbk
 from .assembly import Assembly
 from .alignment import TypingResults
 from .recovery import Recovery
@@ -98,6 +98,8 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
     final_dir = output_dir / assembly_info.sample_name
     out_detail = output_dir / 'ICE_details.tsv'
     out_summary = output_dir / 'ICE_summary.tsv'
+    gbk_records = (load_gbk_records(assembly_info.gbk_file)
+                   if MGE_results or recovery_ICEs else {})
 
     if not out_detail.exists():
         
@@ -140,6 +142,10 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
 
             with open(outfa, 'w') as out_handle:
                 SeqIO.write(SeqRecord(MGE_result.seq, id = MGE_result.ICE_ID, description=''), out_handle, 'fasta')
+            annotated = extract_gbk_region(gbk_records, MGE_result.contig,
+                                           slice(MGE_result.DR1 - 1, MGE_result.DR4),
+                                           MGE_result.ICE_ID)
+            write_matching_gbk([annotated], outfa)
 
             # trna eg. tRNA-Leu,contig1:1421705..1421790[+]
             _, amr_list = abricate(outfa, 'resfinder')
@@ -160,7 +166,8 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
         for rICE_name, ICE_result in recovery_ICEs.items():
             # info: [DR1, DR2, DR3, DR4, final_left, final_right, end0_last, end1_last, trnalist, left_contig, right_contig]
             rICE_count += 1
-            ICE_result.getrfasta(assembly_info, rICE_count, output_dir, temp_dir, rootdir, threads, verbose)
+            ICE_result.getrfasta(assembly_info, rICE_count, output_dir, temp_dir, rootdir, threads, verbose,
+                                gbk_records=gbk_records)
             relaxase = ','.join(ICE_result.mob) if ICE_result.mob else '-'
             system = ','.join(ICE_result.mpf) if ICE_result.mpf else '-'
 

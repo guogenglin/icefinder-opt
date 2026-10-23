@@ -105,7 +105,7 @@ The ICE predicted that located in 2 and more contigs will be marked a `r` as the
 Genetic maps of ICEs that are split across contigs will not be drawn, but antimicrobial resistance genes within these ICEs will still be predicted.
 
 ## Output changes
-The FAA format output has been removed; only FASTA files are retained.
+The FAA format output has been removed. Every predicted MGE is exported as both FASTA and annotated GenBank (`.gbk`).
 
 # Dependencies and Installation
 `BLAST+`, `prodigal`, `prokka`, `macsyfinder`, `hmmsearch`, `vmatch`, `abricate`, `defense-finder`, `mob_suite`, `biopython`, `python` >= 3.11
@@ -156,7 +156,11 @@ PYTHONPATH=src(the root folder) python -m icefinder-opt.cli assembly -i *.fasta
 ```
 
 # Output
-The output file for every input genome will include a fasta file for every predicted MGE.
+For every input genome, each predicted ICE, IME, AICE, or rICE has a `.fasta` file and a matching `.gbk` file with the same filename stem in the sample output directory. No additional option is required.
+
+GenBank regions are extracted directly from the input GenBank file, or from the Prokka annotation when the input is FASTA. Features fully contained in each region retain their qualifiers and are shifted to region-relative coordinates; features crossing the extraction boundary are omitted. Reverse-complemented rICE fragments also have their feature coordinates and strands reversed.
+
+Each rICE has one FASTA file and one GenBank file, both containing multiple records in the same order: left fragment, any middle contigs, and right fragment. These fragments are not joined into a single sequence.
 
 example fasta format file for MGEs:
 ```fasta

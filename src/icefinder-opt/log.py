@@ -6,6 +6,8 @@ Created on Sun May 17 14:03:07 2026
 @e-mail: 2019207025@njau.edu.cn
 """
 
+from __future__ import annotations
+
 import sys
 from inspect import stack
 from datetime import datetime
@@ -63,16 +65,16 @@ MAGENTA = (255, 0, 255)
 GOLDEN = (255, 215, 0)
 
 # Generate the text-based logo with gradient
-gradient_logo = generate_gradient_logo(_LOGO, start_rgb=CYAN, end_rgb=MAGENTA)
+gradient_logo = generate_gradient_logo(_LOGO, start_rgb = CYAN, end_rgb = MAGENTA)
 
 # Define the description message and format it to be centered and bold
-description_msg = "MCSMRT: cluster PacBio reads into zOTU/ASV clusters then classify each zOTU/ASV representative."
+description_msg = 'ICEfinder-opt_v1: predict ICEs, IMEs, AICEs and recovered ICEs in bacterial assemblies.'
 
 # Combine the logo and description into a formatted string
 formatted_description = f"{gradient_logo}\n\n{bold(description_msg.center(LOGO_WIDTH))}\n"
 
 
-def log(message: str = '', verbose: bool = True, rjust: int = 20, stack_depth: int = 1):
+def log(message: str = '', verbose: bool = True, rjust: int = 20, stack_depth: int = 1) -> None:
     '''
     Simple function for logging messages to stderr. Only runs if verbose == True.
     Stack depth can be increased if the parent function name needs to be exposed.
@@ -82,4 +84,7 @@ def log(message: str = '', verbose: bool = True, rjust: int = 20, stack_depth: i
 
 
 class ICEfinderError(RuntimeError):
+    '''
+    Represent an error raised during ICEfinder prediction.
+    '''
     pass

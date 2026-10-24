@@ -8,24 +8,24 @@ Created on Sun May 17 15:31:17 2026
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from Bio import SeqIO
 from Bio.SeqFeature import CompoundLocation
+from Bio.SeqRecord import SeqRecord
 
-from .utils import abricate, format_sequence, gene_key
-from .log import log
+from .utils import abricate, format_sequence, gene_key, load_gbk_records
+from .log import log, ICEfinderError
+from .annotation import ResistanceHit, query_feature_map, scan_resistance
+from .commands import run_command
 
-def run_blast(faa_file: Path, database: str, threads: int, evalue = 1e-4) -> str:
+def run_blast(faa_file: Path, database: str, threads: int, evalue: float = 1e-4) -> str:
     '''
     Run a BLASTP search against the specified database and return the output as a string.
     '''
     command = ['blastp', '-query', str(faa_file), '-db', database, '-evalue', str(evalue), '-num_threads', 
                str(threads), '-max_hsps', '1', '-num_descriptions', '1', '-num_alignments', '1', 
                '-outfmt', '6 std slen stitle']
-    process = subprocess.run(command, capture_output = True, text = True, check = True)
-
-    return process.stdout
+    return run_command(command).stdout
 
 def havalue(threshold: float, out: str) -> dict[str, str]:
     '''
@@ -34,6 +34,8 @@ def havalue(threshold: float, out: str) -> dict[str, str]:
     # pending if the gene reached the threshold
     blast_filter = {}
     for line in out.strip().split('\n'):
+        if not line.strip():
+            continue
         lines = line.strip().split('\t')
         coverage = int(lines[3]) / int(lines[12])
         identity = float(lines[2]) / 100
@@ -49,7 +51,7 @@ def getdf(faa_file: Path, temp_dir: Path, threads: int) -> dict[str, str]:
     #defense-finder used the same way of macsyfinder
     defcmd = ['defense-finder', 'run', '-w', str(threads), str(faa_file), '-o', temp_dir / 'def']
     
-    process = subprocess.run(defcmd, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+    run_command(defcmd)
     
     def_file = temp_dir / 'def' / f'{faa_file.stem}_defense_finder_genes.tsv'
     dfdict = {}
@@ -72,7 +74,10 @@ class Gene:
     Represents a gene in a genomic sequence.
     '''
     def __init__(self, gene_id : str, origin_id : str, start: int, end: int, strand: str, product: str, 
-                 trna: str = 'F', feature: str | None = None, product_map: list[str] | None = None):
+                 trna: str = 'F', feature: str | None = None, product_map: str = '') -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.gene_id        = gene_id
         self.origin_id      = origin_id
         self.start          = start
@@ -81,14 +86,16 @@ class Gene:
         self.product        = product
         self.trna           = trna
         self.feature        = feature or ''
-        self.product_map    = product_map or []
+        self.product_map    = product_map
 
     @property
-    def locus_num(self):
-        '''Return the locus number of the gene, which is the numeric part of the gene ID after the last underscore.'''
+    def locus_num(self) -> int:
+        '''
+        Return the locus number of the gene, which is the numeric part of the gene ID after the last underscore.
+        '''
         return int(self.gene_id.rsplit('_', 1)[1])
     
-    def get_args(self, assembly_info: Assembly, feature: str):
+    def get_args(self, assembly_info: Assembly, feature: str) -> None:
         '''
         Get the feature and product information for the gene based on the assembly information and the provided feature.
         '''
@@ -121,7 +128,10 @@ class Contig:
     '''
     def __init__(
             self, contig_name: str, genes: dict[str, Gene] | None = None, length: int | None = None, 
-            plasmid: str = 'F'):
+            plasmid: str = 'F') -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.name           = contig_name
         self.genes          = genes or {}
         self.length         = length or int()
@@ -137,8 +147,11 @@ class Assembly:
                  fna_file: Path | None = None, ICE_dir: Path | None = None, 
                  contigs: dict[str, Contig] | None = None, argdict: dict[str, str] | None = None, 
                  vfdict: dict[str, str] | None = None, isdict: dict[str, str] | None = None, 
-                 dfdict: dict[str, str] | None = None, metadict: dict[str, str] | None = None, 
-                 popdict: dict[str, str] | None = None, symdict: dict[str, str] | None = None):
+                 dfdict: dict[str, str] | None = None, metaldict: dict[str, str] | None = None,
+                 popdict: dict[str, str] | None = None, symdict: dict[str, str] | None = None) -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.sample_path        = sample_path
         self.sample_name        = sample_name
         self.file_type          = file_type
@@ -153,14 +166,59 @@ class Assembly:
         self.vfdict             = vfdict or {}
         self.isdict             = isdict or {}
         self.dfdict             = dfdict or {}
-        self.metadict           = metadict or {}
+        self.metaldict          = metaldict or {}
         self.popdict            = popdict or {}
         self.symdict            = symdict or {}
+        # All sample state is declared here; search functions return results instead of adding attributes.
+        self.source_records: dict[str, SeqRecord] = {}
+        self.resistance_hits: list[ResistanceHit] = []
+        self.source_records_loaded: bool = False
+        self.resistance_ready: bool = False
+        self.functional_ready: bool = False
 
-    def get_gene_info_from_gff(self, verbose: bool = False):
+    def load_source_records(self) -> dict[str, SeqRecord]:
+        '''
+        Load the original annotation once, retaining source coordinates for every output.
+        '''
+        if not self.source_records_loaded:
+            if not self.gbk_file.is_file():
+                raise ICEfinderError(f'Annotated input is not available for {self.sample_name}: {self.gbk_file}. '
+                                     'Load GenBank input or run Prokka before annotating resistance.')
+            self.source_records = load_gbk_records(self.gbk_file)
+            self.source_records_loaded = True
+        return self.source_records
+
+    def annotate_resistance(self, rootdir: Path, threads: int, verbose: bool = False) -> None:
+        '''
+        Populate AMR and metal annotations once and mark the cache ready only after complete success.
+        '''
+        if self.resistance_ready:
+            return
+        records = self.load_source_records()
+        query_features = query_feature_map(self.contigs, records)
+        result = scan_resistance(self.sample_path, self.faa_file, query_features, rootdir, threads, verbose)
+        self.resistance_hits = result.hits
+        self.argdict = result.amr_genes
+        self.metaldict = result.metal_genes
+        self.resistance_ready = True
+
+    def require_resistance(self) -> None:
+        '''
+        Reject output generation before resistance searches have completed successfully.
+        '''
+        if not self.resistance_ready:
+            raise ICEfinderError(f'Resistance annotations are not ready for {self.sample_name}. '
+                                 'Run Assembly.annotate_resistance() before generating outputs.')
+
+    def get_gene_info_from_gff(self, verbose: bool = False) -> None:
         '''
         Extract gene information from a GFF file and populate the assembly information.
         '''
+        # The contig catalog comes from sequences, not from the presence of annotated genes.
+        # Featureless contigs remain valid input and are filtered explicitly in the next stage.
+        with open(self.sample_path) as handle:
+            records = SeqIO.to_dict(SeqIO.parse(handle, 'fasta'))
+        self.contigs = {name: Contig(name, length = len(record)) for name, record in records.items()}
         with open(self.gff_file) as gff_handle:
             for line in gff_handle:
                 if 'ID=' not in line:
@@ -182,9 +240,9 @@ class Assembly:
                         continue
                 contig = content[0]
                 if contig not in self.contigs:
-                    self.contigs[contig] = Contig(contig)
+                    raise ICEfinderError(f'GFF contig {contig!r} is absent from the annotated assembly.')
 
-                attributes = dict(item.split('=') for item in content[8].split(';') if '=' in item)
+                attributes = dict(item.split('=', 1) for item in content[8].split(';') if '=' in item)
                 # Attribute explanation:
                 # ID           : Unique feature identifier
                 # eC_number    : Enzyme Commission number
@@ -204,12 +262,9 @@ class Assembly:
                 if content[2] in ['tRNA', 'tmRNA']:
                     self.contigs[contig].genes[ids].trna = 'T'
 
-        for record in SeqIO.parse(self.sample_path, 'fasta'):
-            self.contigs[record.id].length = len(record.seq)
-        
         log('Gene information extracted from GFF file.', verbose = verbose)
 
-    def get_gene_info_from_gbk(self, temp_dir: Path, verbose: bool = False):
+    def get_gene_info_from_gbk(self, temp_dir: Path, verbose: bool = False) -> None:
         '''
         Extract gene information from a GenBank file and populate the assembly information.
         '''
@@ -240,7 +295,7 @@ class Assembly:
                     # a gene may across the ori of the bacteria sequencing, the annotation may like this
                     # (999800..1000000,1..500)
                     if isinstance(feature.location, CompoundLocation):
-                        loc_list = sorted(feature.location.parts, key=lambda part: part.start)
+                        loc_list = sorted(feature.location.parts, key = lambda part: part.start)
                         loc = loc_list[-1]
                         if int(loc.end) == len(record.seq):
                             start = int(loc_list[-1].start) - 1
@@ -276,10 +331,10 @@ class Assembly:
 
                         # write new id, information, and na sequence into fna
                         if not ori:
-                            cds_sequence = record.seq[feature.location.start:feature.location.end]
+                            cds_sequence = feature.extract(record.seq)
                         else:
                             cds_sequence = record.seq[start:len(record.seq)] + record.seq[0:end]
-                        if strand == '-':
+                        if ori and strand == '-':
                             cds_sequence = cds_sequence.reverse_complement()
                         fna.write(f'>{newid} {product}\n')
                         fna.write(f'{format_sequence(str(cds_sequence))}\n')
@@ -295,14 +350,14 @@ class Assembly:
 
         log('Gene information extracted from GenBank file.', verbose = verbose)
 
-    def information_filter_marker(self, temp_dir: Path, threads: int, verbose: bool = False):
+    def information_filter_marker(self, temp_dir: Path, threads: int, verbose: bool = False) -> None:
         '''
         Filter out contigs with no genes and identify plasmid contigs.
         '''
-        # Run abricate plasmidfinder
+        # MOB-recon identifies plasmid contigs before MGE detection.
         command = ['mob_recon', '-i', str(self.sample_path), '-o', str(temp_dir / 'mob_recon_results'), 
                 '-n', str(threads)]
-        subprocess.run(command, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+        run_command(command)
         
         with open(temp_dir / 'mob_recon_results' / 'contig_report.txt') as file:
             next(file)
@@ -322,14 +377,16 @@ class Assembly:
 
         log('Plasmid contigs identified.', verbose = verbose)
 
-    def getblast(self, rootdir: Path, temp_dir: Path, threads: int, verbose: bool = False):
+    def annotate_functional_genes(self, rootdir: Path, temp_dir: Path, threads: int, verbose: bool = False) -> None:
         '''
-        Run BLAST searches against various databases and process the results to populate the assembly information.
+        Populate optional functional annotations once, independently of resistance searches and rendering.
         '''
+        if self.functional_ready:
+            return
+        self.require_resistance()
         # a dict set the config of every blast
         blast_config = {
             'IS':    {'db': str(rootdir / 'data' / 'transposase')},
-            'METAL': {'db': str(rootdir / 'data' / 'metal')},
             'POP':   {'db': str(rootdir / 'data' / 'degradation')},
             'SYM':   {'db': str(rootdir / 'data' / 'symbiosis')},
             }
@@ -339,14 +396,14 @@ class Assembly:
             config['out'] = run_blast(self.faa_file, config['db'], threads)
         
         # pending the result and collect the match
-        self.isdict = havalue(0.64, blast_config['IS']['out'])
-        self.vfdict, _ = abricate(self.fna_file, 'vfdb')
-        self.argdict, _ = abricate(self.fna_file, 'resfinder')
-        self.metaldict = havalue(0.64, blast_config['METAL']['out'])
-        self.popdict = havalue(0.64, blast_config['POP']['out'])
-        self.symdict = havalue(0.64, blast_config['SYM']['out'])
-        
-        self.dfdict = getdf(self.faa_file, temp_dir, threads)
+        isdict = havalue(0.64, blast_config['IS']['out'])
+        vfdict, _ = abricate(self.fna_file, 'vfdb')
+        popdict = havalue(0.64, blast_config['POP']['out'])
+        symdict = havalue(0.64, blast_config['SYM']['out'])
+        dfdict = getdf(self.faa_file, temp_dir, threads)
+        self.isdict, self.vfdict = isdict, vfdict
+        self.popdict, self.symdict, self.dfdict = popdict, symdict, dfdict
+        self.functional_ready = True
 
         log('Blast results processed.', verbose = verbose)
 

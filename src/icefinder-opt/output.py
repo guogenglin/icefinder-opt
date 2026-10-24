@@ -6,21 +6,30 @@ Created on Fri May 23 17:23:58 2026
 @e-mail: 2019207025@njau.edu.cn
 """
 
+from __future__ import annotations
+
 import json
 import shutil
 from pathlib import Path
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 
-from .utils import abricate, extract_gbk_region, load_gbk_records, write_matching_gbk
+from .utils import write_matching_gbk
 from .assembly import Assembly
 from .alignment import TypingResults
 from .recovery import Recovery
-from .log import log
+from .log import log, ICEfinderError
+from .annotation import resistance_names
+
+
+DETAIL_HEADER = ['Isolate', 'MGE', 'Location', 'Length', 'GC', 'Relaxase_Type', 'Systems',
+                 'oriT', 'attL', 'attR', 'att_seq', 'tRNA', 'AMR', 'metal', 'middle']
+SUMMARY_HEADER = ['Isolate', 'ICE(rICE_included)', 'ICE(rICE_excluded)', 'IME', 'AICE', 'rICE']
 
 
 def get_color(region: str) -> str:
-    '''Get the color for the region type in the visualization.'''
+    '''
+    Get the color for the region type in the visualization.
+    '''
     coldict = {
         'T4SS-type ICE' : 'fill:rgba(0, 128, 164,0.9)',
         'IME':'fill:rgba(41,76,166,0.9)', 
@@ -30,7 +39,7 @@ def get_color(region: str) -> str:
     return coldict[region]
 
 def generate_comp_output(assembly_info: Assembly, MGE_results: dict[str, TypingResults], final_dir: Path, 
-                         js_dir: Path, rootdir: Path, verbose = False):
+                         js_dir: Path, rootdir: Path, verbose: bool = False) -> None:
     '''
     Generate the output files for the visualization of the predicted ICEs/IMEs/AICEs.
     '''
@@ -49,20 +58,20 @@ def generate_comp_output(assembly_info: Assembly, MGE_results: dict[str, TypingR
             else:
                 typeIE = 'T4SS-type ICE'
             ICEs = {
-				'region': 'Region'+ str(i),
-		        'location': f'{str(MGE_result.DR1)}..{str(MGE_result.DR4)}',
-		        'length': str(MGE_result.length),
-		        'gc': MGE_result.gc,
-		        'type': typeIE,
-		        'detail': regi
-		    }
+                'region': 'Region'+ str(i),
+                'location': f'{str(MGE_result.DR1)}..{str(MGE_result.DR4)}',
+                'length': str(MGE_result.length),
+                'gc': MGE_result.gc,
+                'type': typeIE,
+                'detail': regi
+            }
             homedict = {
-			  	'start' : MGE_result.DR1,
-			   	'end' : MGE_result.DR4,
-			   	'color' : get_color(typeIE),
-			   	'info' : '_'.join([str(MGE_result.length), MGE_result.gc, typeIE]),
-			   	'text' : 'Region'+ str(i)
-			   }
+                'start' : MGE_result.DR1,
+                'end' : MGE_result.DR4,
+                'color' : get_color(typeIE),
+                'info' : '_'.join([str(MGE_result.length), MGE_result.gc, typeIE]),
+                'text' : 'Region'+ str(i)
+               }
             homelist.append(homedict)
             ICEsumlist.append(ICEs)
             i += 1
@@ -73,104 +82,89 @@ def generate_comp_output(assembly_info: Assembly, MGE_results: dict[str, TypingR
     
     shutil.copytree(jsback, js_dir, dirs_exist_ok = True)
 
-def final_refine(recovery_ICEs: dict[str, Recovery], MGE_results: dict[str, TypingResults]) -> dict[str, Recovery]:
+def ensure_output_table(path: Path, columns: list[str]) -> None:
     '''
-    Refine the recovered ICEs by removing those that overlap with the predicted ICEs.
+    Initialize a table or reject an incompatible header before appending sample results.
     '''
-    remove_keys = set()
-    for recovery_name, recovery_ICE in recovery_ICEs.items():
-        middle_contigs = [middle_contig for middle_contig in recovery_ICE.middle_contig]
-        for MGE_result in MGE_results.values():
-            if MGE_result.contig in middle_contigs:
-                remove_keys.add(recovery_name)
-                continue
-    for key in remove_keys:
-        recovery_ICEs.pop(key)
+    header = '\t'.join(columns) + '\n'
+    if path.exists() and path.stat().st_size:
+        with open(path) as handle:
+            if handle.readline() != header:
+                raise ICEfinderError(f'Incompatible output table header: {path}. Use a fresh output directory.')
+    else:
+        with open(path, 'w') as handle:
+            handle.write(header)
 
-    return recovery_ICEs
 
-def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResults], temp_dir: Path, 
-                    recovery_ICEs: dict[str, Recovery], rootdir: Path, output_dir: Path, threads: int, 
-                    verbose: bool = False):
+def detail_row(assembly_info: Assembly, result: TypingResults | Recovery, location: str,
+               att_left: str, att_right: str, amr: str, metal: str, middle: str = '-') -> list[str]:
+    '''
+    Serialize the shared annotation fields of a single-contig MGE or a recovered ICE.
+    '''
+    return [assembly_info.sample_name, result.ICE_name, location, str(result.length), result.gc,
+            ','.join(sorted(result.mob)) or '-', ','.join(sorted(result.mpf)) or '-', result.oritseqs,
+            att_left, att_right, result.DR_seq, result.trnaout, amr, metal, middle]
+
+
+def export_prediction(result: TypingResults | Recovery, final_dir: Path) -> None:
+    '''
+    Write already prepared annotation records through the same FASTA and GenBank validation path.
+    '''
+    if not result.output_ready or not result.output_records:
+        raise ICEfinderError(f'Output records are not ready for {result.ICE_name or "unnamed prediction"}.')
+    final_dir.mkdir(parents = True, exist_ok = True)
+    outfa = final_dir / f'{result.ICE_name}.fasta'
+    with open(outfa, 'w') as handle:
+        SeqIO.write(result.output_records, handle, 'fasta')
+    write_matching_gbk(result.output_records, outfa)
+
+def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResults],
+                    recovery_ICEs: dict[str, Recovery], output_dir: Path,
+                    verbose: bool = False) -> None:
     '''
     Generate the output files for the predicted ICEs/IMEs/AICEs and recovery ICEs.
     '''
+    assembly_info.require_resistance()
+    for result in [*MGE_results.values(), *recovery_ICEs.values()]:
+        if not result.output_ready:
+            raise ICEfinderError('Prepare all prediction records before generating output tables.')
+    output_dir.mkdir(parents = True, exist_ok = True)
     final_dir = output_dir / assembly_info.sample_name
     out_detail = output_dir / 'ICE_details.tsv'
     out_summary = output_dir / 'ICE_summary.tsv'
-    gbk_records = (load_gbk_records(assembly_info.gbk_file)
-                   if MGE_results or recovery_ICEs else {})
-
-    if not out_detail.exists():
-        
-        detail_header = ['Isolate', 'MGE', 'Location', 'Length', 'GC', 'Relaxase_Type', 
-                         'Systems', 'oriT', 'attL', 'attR', 'att_seq', 'tRNA', 'AMR', 'middle']
-        summary_header = ['Isolate', 'ICE(rICE_included)', 'ICE(rICE_excluded)', 'IME', 'AICE', 'rICE']
-        
-        with open(out_detail, 'w') as detail, open(out_summary, 'w') as summary:
-            detail.write(('\t'.join(detail_header)))
-            detail.write('\n')
-            summary.write(('\t'.join(summary_header)))
-            summary.write('\n')
-    
-    out_detail_file = open(out_detail, 'a')
-    out_summary_file = open(out_summary, 'a')
+    ensure_output_table(out_detail, DETAIL_HEADER)
+    ensure_output_table(out_summary, SUMMARY_HEADER)
+    detail_rows: list[list[str]] = []
     
     ICE_count, IME_count, AICE_count = 0, 0, 0
     
     if MGE_results:
         for MGE_name, MGE_result in MGE_results.items():
-            if 'IME' in MGE_name:
+            if MGE_result.category == 'IME':
                 IME_count += 1
-            elif 'AICE' in MGE_name:
+            elif MGE_result.category == 'AICE':
                 AICE_count += 1
             else:
                 ICE_count += 1
                 
-            relaxase = ','.join(MGE_result.mob) if MGE_result.mob else '-'
-            system = ','.join(MGE_result.mpf) if MGE_result.mpf else '-'
-            
             attL, attR = '-', '-'
             if MGE_result.DR2:
                 attL = f'{MGE_result.contig}:{MGE_result.DR1}..{MGE_result.DR2}'
                 attR = f'{MGE_result.contig}:{MGE_result.DR3}..{MGE_result.DR4}'
 
-            if not final_dir.exists():
-                final_dir.mkdir(parents = True)
-
-            outfa = final_dir / f'{MGE_result.ICE_name}.fasta'
-
-            with open(outfa, 'w') as out_handle:
-                SeqIO.write(SeqRecord(MGE_result.seq, id = MGE_result.ICE_ID, description=''), out_handle, 'fasta')
-            annotated = extract_gbk_region(gbk_records, MGE_result.contig,
-                                           slice(MGE_result.DR1 - 1, MGE_result.DR4),
-                                           MGE_result.ICE_ID)
-            write_matching_gbk([annotated], outfa)
+            export_prediction(MGE_result, final_dir)
 
             # trna eg. tRNA-Leu,contig1:1421705..1421790[+]
-            _, amr_list = abricate(outfa, 'resfinder')
-            ICE_amr = (';').join(amr_list) if amr_list else '-'
-            middle_contig = '-'
-            
-            detail_content = [assembly_info.sample_name, MGE_result.ICE_name, 
-                              f'{MGE_result.contig}:({MGE_result.DR1}..{MGE_result.DR4})', str(MGE_result.length), 
-                              MGE_result.gc, relaxase, system, MGE_result.oritseqs, attL, attR, MGE_result.DR_seq, 
-                              MGE_result.trnaout, ICE_amr, middle_contig]
-            
-            out_detail_file.write(('\t'.join(detail_content)))
-            out_detail_file.write('\n')
+            ICE_amr, ICE_metal = resistance_names(assembly_info.resistance_hits, MGE_result.output_regions)
+            detail_rows.append(detail_row(assembly_info, MGE_result,
+                f'{MGE_result.contig}:({MGE_result.DR1}..{MGE_result.DR4})', attL, attR, ICE_amr, ICE_metal))
     
     rICE_count = 0
     if recovery_ICEs:
-        recovery_ICEs = final_refine(recovery_ICEs, MGE_results)
         for rICE_name, ICE_result in recovery_ICEs.items():
             # info: [DR1, DR2, DR3, DR4, final_left, final_right, end0_last, end1_last, trnalist, left_contig, right_contig]
             rICE_count += 1
-            ICE_result.getrfasta(assembly_info, rICE_count, output_dir, temp_dir, rootdir, threads, verbose,
-                                gbk_records=gbk_records)
-            relaxase = ','.join(ICE_result.mob) if ICE_result.mob else '-'
-            system = ','.join(ICE_result.mpf) if ICE_result.mpf else '-'
-
+            export_prediction(ICE_result, final_dir)
             attL, attR = '-', '-'
             if ICE_result.DR2:
                 attL = f'{next(iter(ICE_result.left_contig.keys()))}:{ICE_result.DR1}..{ICE_result.DR2}'
@@ -178,25 +172,17 @@ def generate_output(assembly_info: Assembly, MGE_results: dict[str, TypingResult
 
             if not final_dir.exists():
                 final_dir.mkdir(parents = True)
-            _, amr_list = abricate(final_dir / f'{ICE_result.ICE_name}.fasta', 'resfinder')
-            ICE_amr = (';').join(amr_list) if amr_list else '-'        
+            ICE_amr, ICE_metal = resistance_names(assembly_info.resistance_hits, ICE_result.output_regions)
 
-            if not ICE_result.all_middle:
-                ICE_result.all_middle = ['-']
-            detail_content = [assembly_info.sample_name, ICE_result.ICE_name, (';').join(ICE_result.ICE_location), 
-                              str(ICE_result.length), ICE_result.gc, relaxase, system, ICE_result.oritseqs, attL, attR, 
-                              ICE_result.DR_seq, ICE_result.trnaout, ICE_amr, (';').join(ICE_result.all_middle)]
-            
-            out_detail_file.write(('\t'.join(detail_content)))
-            out_detail_file.write('\n')
+            detail_rows.append(detail_row(assembly_info, ICE_result, ';'.join(ICE_result.ICE_location),
+                attL, attR, ICE_amr, ICE_metal, ';'.join(ICE_result.all_middle) or '-'))
             
     summary_content = [assembly_info.sample_name, str(ICE_count + rICE_count), str(ICE_count), str(IME_count), str(AICE_count), str(rICE_count)]
         
-    out_summary_file.write(('\t'.join(summary_content)))
-    out_summary_file.write('\n')
-    
-    out_detail_file.close()
-    out_summary_file.close()
+    # Append rows only after every exported region in this sample has been generated successfully.
+    with open(out_detail, 'a') as detail, open(out_summary, 'a') as summary:
+        detail.writelines('\t'.join(row) + '\n' for row in detail_rows)
+        summary.write('\t'.join(summary_content) + '\n')
     
     print(f'{assembly_info.sample_name} : {str(ICE_count + rICE_count)} ICE, {str(IME_count)} IME')
 

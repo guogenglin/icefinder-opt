@@ -11,6 +11,8 @@ Shanghai Jiao Tong University. You can find the original website and their conta
 https://tool2-mml.sjtu.edu.cn/ICEberg3/ICEfinder.php
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 import argparse
 import sys
@@ -25,21 +27,20 @@ warnings.simplefilter("ignore", BiopythonDeprecationWarning)
 from .log import formatted_description, bold, ICEfinderError, log
 from .utils import check_cpus, check_programs_shutil
 from .single import assembly_prediction
-from .metaICE import meta_prediction
 
-__version__ = '1.1.0'
+__version__ = '1.2.1'
 
 # ─────────────────────────────────────────────
 # Argument parsing
 # ─────────────────────────────────────────────
-def parse_args(a) -> argparse.Namespace:
+def parse_args(a: list[str]) -> argparse.Namespace:
     '''
     Parse command-line arguments.
     '''
-    parser = argparse.ArgumentParser(prog = 'icefinder-opt', description = formatted_description, add_help = False,
+    parser = argparse.ArgumentParser(prog = 'icefinder-opt_v1', description = formatted_description, add_help = False,
                                      formatter_class = argparse.RawDescriptionHelpFormatter)
     
-    subparsers = parser.add_subparsers(title=bold('Command'), dest='subparser_name', metavar="")
+    subparsers = parser.add_subparsers(title = bold('Command'), dest = 'subparser_name', metavar = "")
 
     assembly_subparser(subparsers)
     metagenome_subparser(subparsers)
@@ -69,14 +70,14 @@ def parse_args(a) -> argparse.Namespace:
     
     return parser.parse_args(a)
 
-def assembly_subparser(subparsers):
+def assembly_subparser(subparsers: argparse._SubParsersAction) -> None:
     '''
     Create the argument parser for the assembly subcommand.
     '''
     assembly_parser = subparsers.add_parser('assembly', description = formatted_description, add_help = False, 
                                             formatter_class = argparse.RawTextHelpFormatter, 
                                             help = 'Predict ICE/IME in an assembled genome file.', 
-                                            usage = 'icefinder-opt assembly [options]')
+                                            usage = 'icefinder-opt_v1 assembly [options]')
     io_group = assembly_parser.add_argument_group(bold('Input and Output'), '')
     in_out_opts(io_group)
     # Parameters group
@@ -85,14 +86,14 @@ def assembly_subparser(subparsers):
     opts = assembly_parser.add_argument_group(bold('Other options'), "")
     other_opts(opts)
 
-def metagenome_subparser(subparsers):
+def metagenome_subparser(subparsers: argparse._SubParsersAction) -> None:
     '''
     Create the argument parser for the metagenome subcommand.
     '''
     metagenome_parser = subparsers.add_parser('metagenome', description = formatted_description, add_help = False, 
                                             formatter_class = argparse.RawTextHelpFormatter, 
-                                            help = 'Predict ICE/IME in a metagenome file.', 
-                                            usage = 'icefinder-opt metagenome [options]')
+                                            help = 'Reserved legacy mode; currently unavailable.',
+                                            usage = 'icefinder-opt_v1 metagenome [options]')
     # Input and Output group
     io_group = metagenome_parser.add_argument_group(bold('Input and Output'), '')
     in_out_opts(io_group)
@@ -102,7 +103,7 @@ def metagenome_subparser(subparsers):
     opts = metagenome_parser.add_argument_group(bold('Other options'), "")
     other_opts(opts)
 
-def in_out_opts(opts: argparse.ArgumentParser):
+def in_out_opts(opts: argparse._ArgumentGroup) -> None:
     '''
     Add input and output options to the argument parser.
     '''
@@ -112,34 +113,39 @@ def in_out_opts(opts: argparse.ArgumentParser):
                         help = 'The name of the output dict (default: ICEfinder_result)')
 
 
-def parameter_opts(opts: argparse.ArgumentParser):
+def parameter_opts(opts: argparse.ArgumentParser) -> None:
     '''
     Add parameter options to the argument parser.
     '''
     opts.add_argument('-t', '--threads', type = int, default = check_cpus(),
                         help = 'Number of threads (default: all available cpus)')
     # opts.add_argument('-s', '--max_space', type = int, help = 'Max gene space for scanning ICE by Macsyfinder(default: 30)')
-    opts.add_argument('-j', '--json', action='store_true', 
+    opts.add_argument('-j', '--json', action = 'store_true', 
                         help = 'output the json based genetic map')
 
 
 
-def other_opts(opts: argparse._ArgumentGroup):
+def other_opts(opts: argparse._ArgumentGroup) -> None:
     '''
     Add other options to the argument parser.
     '''
-    opts.add_argument('-V', '--verbose', action='store_true', 
-                      help='Keep all output files and print debug messages to stderr.')
-    opts.add_argument('-v', '--version', help='Show version number and exit', action='version')
-    opts.add_argument('-h', '--help', help='Show this help message and exit', metavar='')
+    opts.add_argument('-V', '--verbose', action = 'store_true', 
+                      help = 'Print diagnostic messages to stderr.')
+    opts.add_argument('-v', '--version', help = 'Show version number and exit', action = 'version')
+    opts.add_argument('-h', '--help', help = 'Show this help message and exit', metavar = '')
 
 
-def main(argv: list[str] | None = None):
+def main(argv: list[str] | None = None) -> None:
     '''
     Main method for ICEfinder-opt.
     '''
     argv = sys.argv[1:] if argv is None else argv
     args = parse_args(argv)
+    if args.subparser_name == 'metagenome':
+        from .metaICE import meta_prediction
+        meta_prediction(Path(args.input[0]), Path(args.output), args.threads)
+    if args.threads < 1:
+        raise ICEfinderError('The number of threads must be at least 1.')
     
     print(
         'The original authors of ICEfinder2 are Meng Wang and Hong-Yu Ou.\n'
@@ -156,25 +162,18 @@ def main(argv: list[str] | None = None):
     )
     
     output_dir = Path.cwd() / args.output
-    output_dir.mkdir(exist_ok = True)
+    output_dir.mkdir(parents = True, exist_ok = True)
     
-    check_programs_shutil(['defense-finder', 'blastp', 'blastn', 'prodigal', 'prokka', 'macsyfinder', 'hmmsearch', 
-                           'vmatch', 'abricate', 'mob_recon']
-                             + (['kraken'] if args.subparser_name == 'metagenome' else []), 
+    check_programs_shutil(['blastp', 'blastn', 'prodigal', 'prokka', 'macsyfinder', 'hmmsearch',
+                           'mkvtree', 'vmatch', 'abricate', 'mob_recon']
+                             + (['defense-finder'] if args.json else []),
                            verbose = args.verbose)
     
     rootdir = Path(__file__).parents[0]
     
-    if args.subparser_name == 'assembly':
-        for input_file in args.input:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                assembly_prediction(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
-    elif args.subparser_name == 'metagenome':
-        for input_file in args.input:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                meta_prediction(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
-    else:
-        raise ICEfinderError('Invalid mode. Please choose either "assembly" or "metagenome".')
+    for input_file in args.input:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            assembly_prediction(Path(input_file), args.json, args.threads, rootdir, output_dir, Path(temp_dir), args.verbose)
     
     log('ICEfinder completed successfully.', verbose = args.verbose)
 

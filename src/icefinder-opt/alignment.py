@@ -6,13 +6,18 @@ Created on Sun May 17 15:31:17 2026
 @e-mail: 2019207025@njau.edu.cn
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqUtils import gc_fraction
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import SimpleLocation
 
-from .utils import gene_key, getfa, oritseq, get_DR
+from .utils import gene_key, getfa, oritseq, get_DR, extract_gbk_region
 from .assembly import Assembly, Contig, Gene
+from .annotation import source_region, enrich_fragment, add_att, add_orit
 
 
 mandatory_genes = {
@@ -68,12 +73,12 @@ def get_feature(feature: str) -> str:
     Map a feature to its category.
     '''
     featuredict = {
-		'Phage_integrase':'Integrase', 'UPF0236':'Integrase',
+        'Phage_integrase':'Integrase', 'UPF0236':'Integrase',
         'Recombinase':'Integrase', 'rve':'Integrase',
         'TIGR02224':'Integrase', 'TIGR02249':'Integrase',
         'TIGR02225':'Integrase', 'PB001819':'Integrase',
-		'RepSAv2':'Rep', 'DUF3631':'Rep', 'Prim-Pol':'Rep',
-		'FtsK_SpoIIIE':'Tra'}
+        'RepSAv2':'Rep', 'DUF3631':'Rep', 'Prim-Pol':'Rep',
+        'FtsK_SpoIIIE':'Tra'}
     
     if feature in featuredict:
         return f'{featuredict[feature]}@{feature}'
@@ -141,7 +146,10 @@ class MacSyHit:
     Represents a hit from the MacSyFinder output.
     '''
     def __init__(self, hit_id: str, gene_name: str | None = None, tags: str | None = None, 
-                 loc_contig: str | None = None, dis_to_boundary: int = int()):
+                 loc_contig: str | None = None, dis_to_boundary: int = int()) -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.hit_id          = hit_id or ''
         self.gene_name       = gene_name or ''
         self.tags            = tags or ''
@@ -149,7 +157,7 @@ class MacSyHit:
         self.dis_to_boundary = dis_to_boundary or int()
 
     @classmethod
-    def from_macsy_line(cls, hit_id: str, gene_name: str, assembly_contigs: dict[str, Contig]):
+    def from_macsy_line(cls, hit_id: str, gene_name: str, assembly_contigs: dict[str, Contig]) -> MacSyHit:
         '''
         Create a MacSyHit instance from a line of MacSyFinder output.
         '''
@@ -167,8 +175,10 @@ class MacSyHit:
         return(cls(hit_id, gene_name, get_feature(gene_name), loc_contigs, dis_to_boundary))
     
     @property
-    def gene_family(self):
-        '''Determine the family of the gene based on its name.'''
+    def gene_family(self) -> str:
+        '''
+        Determine the family of the gene based on its name.
+        '''
         for family, genes in mandatory_genes.items():
             if self.gene_name in genes:
                 return family
@@ -181,8 +191,10 @@ class MacSyHit:
         return 'neutral'
 
     @property
-    def locus_num(self):
-        '''Get the locus number from the hit ID.'''
+    def locus_num(self) -> int:
+        '''
+        Get the locus number from the hit ID.
+        '''
         return int(self.hit_id.rsplit('_', 1)[1])
 
 
@@ -197,7 +209,10 @@ class TypingResults:
                  expanded_end: int | None = None, DR1: int | None = int(), DR2: int | None = int(), 
                  DR3: int | None = int(), DR4: int | None = int(), DR_seq: str | None = None, 
                  DRw: str | None = '-', gc: str | None = None, trnaout: str | None = '-', 
-                 oritseqs: str | None = '-', length: int | None = None):
+                 oritseqs: str | None = '-', length: int | None = None) -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.sys_id           = sys_id or ''
         self.category         = category or ''
         self.mob              = mob or set()
@@ -219,9 +234,15 @@ class TypingResults:
         self.trnaout          = trnaout or '-'
         self.oritseqs         = oritseqs or '-'
         self.length           = length or int()
+        self.ICE_name: str = ''
+        self.seq: Seq = Seq('')
+        self.orit_hits: list[dict[str, int]] = []
+        self.output_records: list[SeqRecord] = []
+        self.output_regions: list[tuple[str, SimpleLocation]] = []
+        self.output_ready: bool = False
 
 
-    def add_hit(self, gene_name: str, model_fqn: str, hit_id: str, assembly_contigs: dict[str, Contig]):
+    def add_hit(self, gene_name: str, model_fqn: str, hit_id: str, assembly_contigs: dict[str, Contig]) -> None:
         '''
         Add a new hit to the typing results.
         '''
@@ -236,7 +257,7 @@ class TypingResults:
         
         self.elements.append(MacSyHit.from_macsy_line(hit_id, gene_name, assembly_contigs))
 
-    def merge_tRNA(self, assembly_info: Assembly, temp_dir: Path, EXPAND: int = 20):
+    def merge_tRNA(self, assembly_info: Assembly, temp_dir: Path, EXPAND: int = 20) -> None:
         '''
         Merge tRNA information into the typing results.
         '''
@@ -334,12 +355,13 @@ class TypingResults:
                     self.DR4 = int(DRs[3])
                     break
 
-    def basic_info(self, assembly_info: Assembly, rootdir: Path, temp_dir: Path, threads: int):
+    def prepare_output(self, assembly_info: Assembly, rootdir: Path, temp_dir: Path, threads: int) -> None:
         '''
-        Extract basic information about the predicted ICE, including sequence, GC content, and direct repeats.
+        Prepare the annotated MGE record and oriT results before any output is written.
         '''
+        assembly_info.require_resistance()
+        self.output_ready = False
         self.ICE_name = f'{assembly_info.sample_name}_{self.sys_id}'   # eg. aHPS7_ICE1
-        self.ICE_ID = f'{assembly_info.sample_name}_{self.contig}_{self.DR1}-{self.DR4}'
         self.seq = getfa(assembly_info.sample_path, self.contig, self.DR1, self.DR4)
         self.gc = f'{gc_fraction(self.seq) * 100:.2f}'
         if self.DR2: # pending if there is a attL
@@ -355,6 +377,19 @@ class TypingResults:
             self.trnaout = (';').join(trnaout)
             # trnaout eg. [tRNA-Leu (1421705..1421790) [+]; ]
 
-        self.oritseqs = oritseq(assembly_info.sample_path, self.ICE_name, self.contig, self.DR1, self.DR4, rootdir, temp_dir, threads)
+        self.orit_hits = []
+        self.oritseqs = oritseq(assembly_info.sample_path, self.ICE_name, self.contig, self.DR1, self.DR4,
+                               rootdir, temp_dir, threads, hits = self.orit_hits)
         # oritdesc = "<br>".join([oritseqs[i:i+63] for i in range(0, len(oritseqs), 63)])
         self.length = len(self.seq)
+        records = assembly_info.source_records
+        record = extract_gbk_region(records, self.contig, slice(self.DR1 - 1, self.DR4), self.ICE_name)
+        region = source_region(records[self.contig], slice(self.DR1 - 1, self.DR4))
+        record = enrich_fragment(record, self.contig, region, assembly_info.resistance_hits)
+        if self.DR2:
+            add_att(record, 'attL', self.DR1, self.DR2, region)
+            add_att(record, 'attR', self.DR3, self.DR4, region)
+        add_orit([record], self.orit_hits)
+        self.output_records = [record]
+        self.output_regions = [(self.contig, region)]
+        self.output_ready = True

@@ -6,6 +6,8 @@ Created on Fri May 22 10:34:31 2026
 @e-mail: 2019207025@njau.edu.cn
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from Bio.SeqUtils import gc_fraction
@@ -14,10 +16,10 @@ from Bio.Seq import Seq
 from .assembly import Assembly
 from .alignment import TypingResults
 from .utils import gene_key, process_gene
-from .log import log
+from .log import log, ICEfinderError
 
 
-def getcolor(feature: str, product: list[str]) -> tuple[str, str]:
+def getcolor(feature: str, product: str) -> tuple[str, str]:
     '''
     Get the color and name of a gene based on its feature and product.
     '''
@@ -70,7 +72,7 @@ def getcolor(feature: str, product: list[str]) -> tuple[str, str]:
     
     return coldict[feature], namedict[feature]
         
-def calculate_gc(seq: Seq, window_size = 500, step_size = 50) -> dict:
+def calculate_gc(seq: Seq, window_size: int = 500, step_size: int = 50) -> dict:
     '''
     Calculate the GC content of a sequence using a sliding window approach.
     '''
@@ -97,19 +99,21 @@ def calculate_gc(seq: Seq, window_size = 500, step_size = 50) -> dict:
 
     return gcdict
 
-def get_map(assembly_info: Assembly, MGE_results: dict[str, TypingResults], rootdir: Path, temp_dir: Path, 
-            output_dir: Path, threads: int, verbose: bool = False) -> tuple[Path, Path]:
+def get_map(assembly_info: Assembly, MGE_results: dict[str, TypingResults], rootdir: Path,
+            output_dir: Path, verbose: bool = False) -> tuple[Path, Path]:
     '''
     Generate genetic maps for ICEs and save the results in the specified output directory.
     '''
+    assembly_info.require_resistance()
+    if not assembly_info.functional_ready:
+        raise ICEfinderError('Functional annotations are not ready. '
+                             'Run Assembly.annotate_functional_genes() before rendering maps.')
     final_dir = output_dir / assembly_info.sample_name
     final_dir.mkdir(parents = True, exist_ok = True)
     js_dir = final_dir / 'js'
     js_dir.mkdir(parents = True, exist_ok = True)
     viewfile = rootdir / 'data' / 'js' / 'view.html'
     gcmap = rootdir / 'data' / 'js' / 'gcmap.js'
-    
-    assembly_info.getblast(rootdir, temp_dir, threads, verbose)
     
     for MGE_result in MGE_results.values():
         genelist = []
@@ -205,9 +209,9 @@ def get_map(assembly_info: Assembly, MGE_results: dict[str, TypingResults], root
             gein2.write(original_content)	
         
         maps = str(mapforlist)+';\nvar orfs2 ='+str(maprevlist)+';\nvar clusterf2 = { start: '+start+', end: '+ \
-				  end+', idx: 1, orfs: orfs, borders: borders, tta_codons:tta_codons,\
+                  end+', idx: 1, orfs: orfs, borders: borders, tta_codons:tta_codons,\
 				  label: \'\', unordered: true };\nvar clusterr2 = { start: '+ start+', end: '+ \
-				  end+', idx: 2, orfs: orfs2, borders: borders, tta_codons:tta_codons,\
+                  end+', idx: 2, orfs: orfs2, borders: borders, tta_codons:tta_codons,\
 				  label: \'\', unordered: true };\nsvgene.drawClusters("'+MGE_result.sys_id+'", [clusterf2, clusterr2], 50, 920);'
         
         with open(mapfile,'wt') as map_file:

@@ -6,16 +6,20 @@ Created on Wes May 20 13:19:31 2026
 @e-mail: 2019207025@njau.edu.cn
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import SimpleLocation
 from Bio.SeqUtils import gc_fraction
 
-from .utils import get_DR, getfa, oritseq, extract_gbk_region, load_gbk_records, write_matching_gbk
+from .utils import get_DR, getfa, oritseq, extract_gbk_region
 from .alignment import MacSyHit, get_feature
 from .assembly import Assembly, Gene
 from .log import log, ICEfinderError
+from .annotation import source_region, add_att, add_orit, enrich_fragment
 
 
 def is_connected(a: MacSyHit, b: MacSyHit, max_space: int) -> bool:
@@ -125,23 +129,34 @@ def search_trna(edge_contig: dict[str, list[MacSyHit]], edge_gene: Gene, edge_di
                     trnalist.append(gene)
             return min(trnalist, key = lambda g: abs(g.locus_num - edge_gene.locus_num), default = None)
     else:
-         raise ICEfinderError('flanking mark should be either "left" or "right".')
+        raise ICEfinderError('flanking mark should be either "left" or "right".')
 
 # ─────────────────────────────────────────────
 # Data classes
 # ─────────────────────────────────────────────
 class UnionFind:
-    '''Union-Find data structure for clustering hits.'''
-    def __init__(self, n: int):
+    '''
+    Union-Find data structure for clustering hits.
+    '''
+    def __init__(self, n: int) -> None:
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.parent = list(range(n))
         self.rank = [0] * n
 
-    def find(self, x):
+    def find(self, x: int) -> int:
+        '''
+        Find the representative of a cluster and compress the path to its root.
+        '''
         if self.parent[x] != x:
             self.parent[x] = self.find(self.parent[x])
         return self.parent[x]
 
-    def union(self, x, y):
+    def union(self, x: int, y: int) -> None:
+        '''
+        Merge two clusters using their ranks to keep the tree shallow.
+        '''
         px, py = self.find(x), self.find(y)
 
         if px == py:
@@ -157,19 +172,24 @@ class UnionFind:
 
 
 class Recovery:
-    '''Class representing a recovered ICE with its associated information.'''
+    '''
+    Class representing a recovered ICE with its associated information.
+    '''
     def __init__(self, middle_contig: dict[str, list[MacSyHit]] | None = None, left_contig: dict[str, list[MacSyHit]] | None = None, 
                  right_contig: dict[str, list[MacSyHit]] | None = None, left_direction: str | None = None, 
                  right_direction: str | None = None, left_gene: Gene | None = None, right_gene: Gene | None = None, 
                  mob: set | None = None, mpf: set | None = None, all_gene_num: set[int] | None = None, 
-                 trnalist: list[Gene] | None = [], expanded_left: Gene | None = None, 
+                 trnalist: list[Gene] | None = None, expanded_left: Gene | None = None,
                  expanded_right: Gene | None = None, DR1: int | None = 0, DR2: int | None = 0, DR3: int | None = 0, 
                  DR4: int | None = 0, DR_seq: str | None = None, left_seq: Seq | None = None, 
-                 right_seq: Seq | None = None, ICE_location: list | None = None, gc: str | None = None, 
+                 right_seq: Seq | None = None, ICE_location: list[str] | None = None, gc: str | None = None,
                  trnaout: str | None = '-', oritseqs: str | None = '-', length: int | None = None, 
-                 all_middle: list | None = None):
+                 all_middle: list[str] | None = None) -> None:
         
         # left_gene....left_end | middle_contig | right_end....right_gene
+        '''
+        Initialize the object and store its prediction or annotation attributes.
+        '''
         self.middle_contig    = middle_contig or {}
         # acturally we cannot determine which one is left or right of the MGE from the recovery results, 
         # the reason i write the object this way is to make it easier to understand the structure
@@ -196,12 +216,19 @@ class Recovery:
         self.gc               = gc or ''
         self.trnaout          = trnaout or '-'
         self.oritseqs         = oritseqs or '-'
-        self.all_middle       = all_middle or ['-']
-        self.length           = length
+        self.all_middle       = all_middle or []
+        self.length           = length if length is not None else 0
+        self.ICE_name: str = ''
+        self.left_slice: slice = slice(None)
+        self.right_slice: slice = slice(None)
+        self.orit_hits: list[dict[str, int]] = []
+        self.output_regions: list[tuple[str, SimpleLocation]] = []
+        self.output_records: list[SeqRecord] = []
+        self.output_ready: bool = False
     
     @classmethod
     def parse_raw_recovery(cls, mge_name: str, mge_result: list[MacSyHit], assembly_info: Assembly, 
-                           EXPAND: int = 20):
+                           EXPAND: int = 20) -> Recovery | None:
         '''
         Parse the raw recovery result from MacSyFinder and construct a Recovery object.
         '''
@@ -236,16 +263,16 @@ class Recovery:
                     left_gene, right_gene, mob, mpf, all_gene_num))
 
                    
-    def merge_tRNA(self, assembly_info: Assembly, temp_dir: Path, EXPAND: int = 20):
+    def merge_tRNA(self, assembly_info: Assembly, temp_dir: Path, EXPAND: int = 20) -> None:
         '''
         Search for tRNA genes in the flanking regions of the ICE and update the DR information accordingly.
         '''
         left_trna = search_trna(self.left_contig, self.left_gene, self.left_direction, assembly_info, 'left', 
-                                EXPAND)
+                            EXPAND)
         if left_trna:
             self.trnalist.append(left_trna)
         right_trna = search_trna(self.right_contig, self.right_gene, self.right_direction, assembly_info, 'right', 
-                                 EXPAND)
+                             EXPAND)
         if right_trna:
             self.trnalist.append(right_trna)
 
@@ -268,9 +295,12 @@ class Recovery:
         self.left_slice = slice(None)
         self.right_slice = slice(None)
 
-        def trim_ends(left: slice, right: slice):
+        def trim_ends(left: slice, right: slice) -> None:
             # Vmatch coordinates always refer to the original concatenated contigs.
             # Each candidate replaces the previous boundary, rather than trimming it again.
+            '''
+            Extract both fragments from the original sequences using the current repeat candidate.
+            '''
             self.left_slice, self.right_slice = left, right
             self.left_seq = left_source[left]
             self.right_seq = right_source[right]
@@ -299,7 +329,7 @@ class Recovery:
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end # left match
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)   # right do not bias too match
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
-                            and -10000 <= self.expanded_left.start - int(DRs[0]) <= 10000)):
+                        and -10000 <= self.expanded_left.start - int(DRs[0]) <= 10000)):
                         self.DR1 = int(DRs[0]) + 1
                         self.DR2 = int(DRs[1])
                         self.DR3 = int(DRs[2]) - len_left_seq + 1
@@ -311,94 +341,71 @@ class Recovery:
                     if (((len_left_seq - self.expanded_left.end) <= int(DRs[0]) <= (len_left_seq - self.expanded_left.start) 
                          and -10000 <= int(DRs[3]) - len_left_seq - self.expanded_right.end <= 10000)
                         or (self.expanded_right.start <= int(DRs[3]) - len_left_seq <= self.expanded_right.end 
-                            and -10000 <= len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
-                            self.DR1 = len_left_seq - int(DRs[1]) + 1
-                            self.DR2 = len_left_seq - int(DRs[0])
-                            self.DR3 = int(DRs[2]) - len_left_seq + 1
-                            self.DR4 = int(DRs[3]) - len_left_seq
-                            self.DR_seq = str(getfa(temp_DR, 'temp_DR', int(DRs[0]) + 1, int(DRs[1])))
-                            trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
+                        and -10000 <= len_left_seq - self.expanded_left.start - int(DRs[0]) <= 10000)):
+                        self.DR1 = len_left_seq - int(DRs[1]) + 1
+                        self.DR2 = len_left_seq - int(DRs[0])
+                        self.DR3 = int(DRs[2]) - len_left_seq + 1
+                        self.DR4 = int(DRs[3]) - len_left_seq
+                        self.DR_seq = str(getfa(temp_DR, 'temp_DR', int(DRs[0]) + 1, int(DRs[1])))
+                        trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
                 else:   # self.left_direction == '+' and self.right_direction == '-', there are only 3 posibility because of pending_direction
                     if ((self.expanded_left.start <= int(DRs[0]) <= self.expanded_left.end 
                          and -10000 <= int(DRs[3]) - len_left_seq - len_right_seq + self.expanded_right.end <= 10000)
                         or self.expanded_right.start <= (len_right_seq - int(DRs[3]) + len_left_seq) <= self.expanded_right.end 
                         and -10000 <= self.expanded_left.start - int(DRs[0]) <= 10000):
-                            self.DR1 = int(DRs[0]) + 1
-                            self.DR2 = int(DRs[1])
-                            self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1
-                            self.DR4 = len_right_seq - int(DRs[2]) + len_left_seq
-                            self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
-                            trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
+                        self.DR1 = int(DRs[0]) + 1
+                        self.DR2 = int(DRs[1])
+                        self.DR3 = len_right_seq - int(DRs[3]) + len_left_seq + 1
+                        self.DR4 = len_right_seq - int(DRs[2]) + len_left_seq
+                        self.DR_seq = str(getfa(temp_DR, 'temp_DR', self.DR1, self.DR2))
+                        trim_ends(slice(int(DRs[0]), None), slice(None, int(DRs[3]) - len_left_seq))
 
-    def getrfasta(self, assembly_info: Assembly, rICE_count: int, output_dir: Path, temp_dir: Path, rootdir: Path, 
-                  threads: int, verbose: bool = False, *, gbk_records: dict[str, SeqRecord] | None = None):
+    def prepare_output(self, assembly_info: Assembly, rootdir: Path, temp_dir: Path, threads: int,
+                       rICE_count: int, verbose: bool = False) -> None:
         '''
-        Generate the fasta file for the recovery ICE, and also fill in the attributes of the Recovery object.
+        Prepare annotated rICE fragments and oriT results before any output is written.
         '''
+        assembly_info.require_resistance()
+        self.output_ready = False
         self.ICE_name = f'{assembly_info.sample_name}_rICE_{rICE_count}'
-        
-        final_dir = output_dir / assembly_info.sample_name
-        if not final_dir.exists():
-            final_dir.mkdir(parents = True)
-
-        def fragment_location(contig: str, region: slice, direction: str):
-            length = assembly_info.contigs[contig].length
-            start, stop, _ = region.indices(length)
-            if direction == '-':
-                start, stop = length - stop, length - start
-            return (f'{assembly_info.sample_name}_{contig}_{start + 1}-{stop}',
-                    f'{contig}:{start + 1}..{stop}')
-
-        left_ID, left_loc = fragment_location(next(iter(self.left_contig)), self.left_slice, self.left_direction)
-        right_ID, right_loc = fragment_location(next(iter(self.right_contig)), self.right_slice, self.right_direction)
-        
-        self.ICE_location = [left_loc]
-
-        outfa = final_dir / f'{self.ICE_name}.fasta'
-        if gbk_records is None:
-            gbk_records = load_gbk_records(assembly_info.gbk_file)
-        annotated_records = [extract_gbk_region(
-            gbk_records, next(iter(self.left_contig)), self.left_slice, left_ID,
-            reverse=self.left_direction == '-')]
-
-        with open(outfa, 'w') as out_handle:
-                SeqIO.write(SeqRecord(self.left_seq, id = left_ID, description=''), out_handle, 'fasta')
-
-        all_seq = self.left_seq
-        
-        self.all_middle = [contig for contig, hit in self.middle_contig.items()]
-
-        with open(outfa, 'a') as out_handle:
-            for record in SeqIO.parse(assembly_info.sample_path, 'fasta'):
-                if record.id in self.all_middle:
-                    record.description = ''
-                    SeqIO.write(record, out_handle, 'fasta')
-                    annotated_records.append(extract_gbk_region(
-                        gbk_records, record.id, slice(None), record.id))
-                    all_seq += record.seq
-
-            SeqIO.write(SeqRecord(self.right_seq, id = right_ID, description=''), out_handle, 'fasta')
-            all_seq += self.right_seq
-        annotated_records.append(extract_gbk_region(
-            gbk_records, next(iter(self.right_contig)), self.right_slice, right_ID,
-            reverse=self.right_direction == '-'))
-        write_matching_gbk(annotated_records, outfa)
+        gbk_records = assembly_info.source_records
+        self.all_middle = [contig for contig in gbk_records if contig in self.middle_contig]
+        fragments = [(next(iter(self.left_contig)), self.left_slice, self.left_direction == '-')]
+        fragments.extend((contig, slice(None), False) for contig in self.all_middle)
+        fragments.append((next(iter(self.right_contig)), self.right_slice, self.right_direction == '-'))
+        annotated_records = []
+        self.output_regions = []
+        self.ICE_location = []
+        for index, (contig, region_slice, reverse) in enumerate(fragments, 1):
+            record = extract_gbk_region(gbk_records, contig, region_slice,
+                                    f'{self.ICE_name}_part{index}', reverse = reverse)
+            region = source_region(gbk_records[contig], region_slice, reverse)
+            record = enrich_fragment(record, contig, region, assembly_info.resistance_hits)
+            self.output_regions.append((contig, region))
+            self.ICE_location.append(f'{contig}:{int(region.start) + 1}..{int(region.end)}')
+            annotated_records.append(record)
+        if self.DR2:
+            add_att(annotated_records[0], 'attL', self.DR1, self.DR2, self.output_regions[0][1])
+            add_att(annotated_records[-1], 'attR', self.DR3, self.DR4, self.output_regions[-1][1])
+        all_seq = sum((record.seq for record in annotated_records), Seq(''))
 
         orifa = temp_dir / f'{self.ICE_name}_fororit.fasta'
 
         with open(orifa, 'w') as out_handle:
-                SeqIO.write(SeqRecord(all_seq, id = 'fororit', description=''), out_handle, 'fasta')
+                SeqIO.write(SeqRecord(all_seq, id = 'fororit', description = ''), out_handle, 'fasta')
 
-        self.ICE_location += self.all_middle
-        self.ICE_location.append(right_loc)
         self.gc = f'{gc_fraction(all_seq) * 100:.2f}'
-        self.oritseqs = oritseq(orifa, self.ICE_name, 'fororit', 1, len(all_seq) + 1, rootdir, temp_dir, threads)
+        self.orit_hits = []
+        self.oritseqs = oritseq(orifa, self.ICE_name, 'fororit', 1, len(all_seq), rootdir, temp_dir, threads,
+                           hits = self.orit_hits, segment_lengths = [len(record) for record in annotated_records])
+        add_orit(annotated_records, self.orit_hits)
         if self.trnalist:
             trnaout = []
             for trna in self.trnalist:
                 trnaout.append(f'{trna.product} ({trna.start}..{trna.end}) [{trna.strand}]')
             self.trnaout = (';').join(trnaout)
         self.length = len(all_seq)
-
-        log(f'{self.ICE_name} recovery FASTA and GenBank generated.', verbose = verbose)
+        self.output_records = annotated_records
+        self.output_ready = True
+        log(f'{self.ICE_name} recovery annotations prepared.', verbose = verbose)
 

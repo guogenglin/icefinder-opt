@@ -11,9 +11,10 @@ Shanghai Jiao Tong University. You can find the original website and their conta
 https://tool2-mml.sjtu.edu.cn/ICEberg3/ICEfinder.php
 """
 
+from __future__ import annotations
+
 
 from pathlib import Path
-import subprocess
 import shutil
 from collections import defaultdict
 from itertools import combinations
@@ -25,24 +26,27 @@ from .recovery import UnionFind, Recovery, is_connected, validate_cluster
 from .output import generate_comp_output, generate_output
 from .get_map import get_map
 from .log import log
+from .commands import run_command
 
 
 # ─────────────────────────────────────────────
 # Core methods
 # ─────────────────────────────────────────────
-def prokkanno(assembly_info: Assembly, temp_dir: Path, threads: int, verbose: bool = False):
+def prokkanno(assembly_info: Assembly, temp_dir: Path, threads: int, verbose: bool = False) -> None:
     '''
     Annotate the fasta sequence by prokka.
     '''
     cmd = ['prokka', str(assembly_info.sample_path.resolve()), '--force', '--cpus', str(threads), '--cdsrnaolap', 
            '--prefix', assembly_info.sample_name, '--locustag', assembly_info.temp_id, '-o', 
            str(temp_dir / assembly_info.sample_name)]
-    subprocess.run(cmd, check = True)
+    run_command(cmd, capture_output = False)
 
     assembly_info.gff_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.gff'
     assembly_info.gbk_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.gbk'
     assembly_info.faa_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.faa'
     assembly_info.fna_file = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.ffn'
+    # Use Prokka's assembly consistently with its GFF and GenBank record identifiers.
+    assembly_info.sample_path = temp_dir / assembly_info.sample_name / f'{assembly_info.sample_name}.fna'
 
     log('Prokka annotation completed.', verbose = verbose)
 
@@ -135,7 +139,7 @@ def get_MGE(assembly_info: Assembly, rootdir: Path, temp_dir: Path, verbose: boo
                '--models', 'ICEscan', 'all', '--replicon-topology', 'linear', '--coverage-profile', 
                '0.3', '--sequence-db', assembly_info.faa_file, '-o', str(assembly_info.ICE_dir)]
     
-    subprocess.run(ICE_cmd, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+    run_command(ICE_cmd)
     # ICE_res columns: replicon, hit_id, gene_name, hit_pos, model_fqn, sys_id, sys_loci, locus_num
     ftag = ICE_filter(ICE_res)  # List containing sys_id of all predicted ICE, AICE, and IME
 
@@ -387,7 +391,7 @@ def MGE_reorder(MGE_results: dict[str, TypingResults], verbose: bool = False) ->
     return new_MGE_results
 
 def boundary_of_rICE(assembly_info: Assembly, recovery_MGEs: dict[str, list[MacSyHit]], temp_dir: Path, 
-                     verbose: bool = False, EXPAND = 20) -> dict[str, Recovery]:
+                     verbose: bool = False, EXPAND: int = 20) -> dict[str, Recovery]:
     '''
     Determine the boundary of recovered ICEs and merge tRNA information.
     '''
@@ -442,8 +446,17 @@ def boundary_of_rICE(assembly_info: Assembly, recovery_MGEs: dict[str, list[MacS
     log('Recovery ICE results merged with tRNA information.', verbose = verbose)
     return recovery_ICEs    
 
-def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir: Path, output_dir: Path, temp_dir: Path, 
-            verbose: bool):
+def refine_recoveries(recovery_ICEs: dict[str, Recovery], MGE_results: dict[str, TypingResults]) -> dict[str, Recovery]:
+    '''
+    Remove recoveries whose middle fragments overlap single-contig predictions without changing input results.
+    '''
+    predicted_contigs = {result.contig for result in MGE_results.values()}
+    return {name: result for name, result in recovery_ICEs.items()
+            if predicted_contigs.isdisjoint(result.middle_contig)}
+
+
+def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir: Path, output_dir: Path, temp_dir: Path,
+            verbose: bool) -> None:
     '''
     The main function for single genome analysis.
     '''
@@ -457,6 +470,7 @@ def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir:
     else:
         assembly_info.get_gene_info_from_gbk(temp_dir, verbose)
     assembly_info.information_filter_marker(temp_dir, threads, verbose)
+    assembly_info.annotate_resistance(rootdir, threads, verbose)
     # ── Step 2: Detect MGEs and recover ICEs ───────────────────────────────────────────────
     MGE_results = get_MGE(assembly_info, rootdir, temp_dir, verbose)
     recovery_MGEs = ICE_recovery(assembly_info, verbose)
@@ -467,11 +481,16 @@ def assembly_prediction(input_file: Path, json_set: bool, threads: int, rootdir:
     log('MGE results merged with tRNA information.', verbose = verbose)
     MGE_results = MGE_reorder(MGE_results, verbose)
     recovery_ICEs = boundary_of_rICE(assembly_info, recovery_MGEs, temp_dir, verbose, EXPAND = 20)
-    # ── Step 4: Generate output files ───────────────────────────────────────────────
-    if MGE_results:
-        for MGE_name, MGE_result in MGE_results.items():
-            MGE_result.basic_info(assembly_info, rootdir, temp_dir, threads)
-        if json_set:
-            final_dir, js_dir = get_map(assembly_info, MGE_results, rootdir, temp_dir, output_dir, threads, verbose)
-            generate_comp_output(assembly_info, MGE_results, final_dir, js_dir, rootdir, verbose)
-    generate_output(assembly_info, MGE_results, temp_dir, recovery_ICEs, rootdir, output_dir, threads, verbose)
+    # ── Step 4: Prepare annotated records and oriT information ──────────────────────
+    for MGE_result in MGE_results.values():
+        MGE_result.prepare_output(assembly_info, rootdir, temp_dir, threads)
+    recovery_ICEs = refine_recoveries(recovery_ICEs, MGE_results)
+    for index, result in enumerate(recovery_ICEs.values(), 1):
+        result.prepare_output(assembly_info, rootdir, temp_dir, threads, index, verbose)
+    # ── Step 5: Render optional maps from complete annotation results ──────────────
+    if json_set and MGE_results:
+        assembly_info.annotate_functional_genes(rootdir, temp_dir, threads, verbose)
+        final_dir, js_dir = get_map(assembly_info, MGE_results, rootdir, output_dir, verbose)
+        generate_comp_output(assembly_info, MGE_results, final_dir, js_dir, rootdir, verbose)
+    # ── Step 6: Write prepared sequences and tables without starting searches ───────
+    generate_output(assembly_info, MGE_results, recovery_ICEs, output_dir, verbose)

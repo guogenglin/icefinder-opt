@@ -28,7 +28,7 @@ from .log import formatted_description, bold, ICEfinderError, log
 from .utils import check_cpus, check_programs_shutil
 from .single import assembly_prediction
 
-__version__ = '1.2.1'
+__version__ = '1.1.1'
 
 # ─────────────────────────────────────────────
 # Argument parsing
